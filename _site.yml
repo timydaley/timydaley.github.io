@@ -1,0 +1,13 @@
+name: "A collection of poorly-executed thoughts and essays"
+navbar:
+  title: "HOME"
+  left:
+    - text: "Fisher vs Stouffer"
+      href: FisherVsStouffer.html
+output_dir: "."
+output:
+  html_document:
+    theme: yeti
+    highlight: textmate
+#    include:
+#      after_body: _footer.html

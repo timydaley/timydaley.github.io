@@ -1,0 +1,10 @@
+---
+title: "A collection of poorly-executed thoughts and essays"
+author:  "[Timothy Daley](https://timydaley.github.io/)"
+output:
+  html_document:
+    fig_width: 1
+---
+
+----
+
