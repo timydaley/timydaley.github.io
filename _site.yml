@@ -4,6 +4,8 @@ navbar:
   left:
     - text: "Fisher vs Stouffer"
       href: FisherVsStouffer.html
+    - text: "emprical estimation of the global FDR"
+      href: empiricalFDR.html
 output_dir: "."
 output:
   html_document:

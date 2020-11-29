@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Timothy Daley" />
+
+
+<title>Empirical estimation of FDR</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/yeti.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/anchor-sections-1.0/anchor-sections.css" rel="stylesheet" />
+<script src="site_libs/anchor-sections-1.0/anchor-sections.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 45px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 50px;
+  margin-top: -50px;
+}
+.section h2 {
+  padding-top: 50px;
+  margin-top: -50px;
+}
+.section h3 {
+  padding-top: 50px;
+  margin-top: -50px;
+}
+.section h4 {
+  padding-top: 50px;
+  margin-top: -50px;
+}
+.section h5 {
+  padding-top: 50px;
+  margin-top: -50px;
+}
+.section h6 {
+  padding-top: 50px;
+  margin-top: -50px;
+}
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #ffffff;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">HOME</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="FisherVsStouffer.html">Fisher vs Stouffer</a>
+</li>
+<li>
+  <a href="empiricalFDR.html">emprical estimation of the global FDR</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Empirical estimation of FDR</h1>
+<h4 class="author">Timothy Daley</h4>
+<h4 class="date">7/11/2020</h4>
+
+</div>
+
+
+<p>An idea I put into package CRISPhieRmix (<a href="https://github.com/timydaley/CRISPhieRmix">R package</a>, <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1538-6">paper</a>) is a way to estimate global false discovery rates (FDRs) from local fdrs. The FDR of an observation <span class="math inline">\(x\)</span> is fraction of false discoveries if we set our threshold to <span class="math inline">\(x\)</span>. Assuming we are looking for extremely large outliers, this is <span class="math inline">\(\Pr(\text{null} | X \geq x)\)</span>. The local false discovery rate, on the other hand, is the probability that observation <span class="math inline">\(x\)</span> is null, or in other words <span class="math inline">\(\Pr(\text{null} | x)\)</span>.</p>
+<p>The idea for empirical estimation came from an anology from Efron, which I believe was in his book <a href="https://statweb.stanford.edu/~ckirby/brad/LSI/monograph_CUP.pdf">Large-Scale Inference</a>, the local false discovery rate is akin to the pdf and the global FDR is akin the cdf. We can see this from the (rather loose) definitions given above. Indeed, formally the global false discovery rates can be defined as the integral over the tail area of the local false discovery rates, as well as the intuition that the overall FDR must be equal to the average of the individual FDRs.</p>
+<p>For empirical estimation of the FDR, we just take the average of all local fdr’s lower than the one under consideration to be the estimate of the global FDR. In fact, this is an unbiased estimate of the marginal false discovery rate, defined formally in the one dimensional case (which helps us to give intuition as <span class="math display">\[
+\text{mFDR}(x) = \frac{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x \cap g \text{ is null}) \big)}{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x) \big)}.
+\]</span> A more formal definition (see <a href="http://genomine.org/papers/Storey_FDR_2010.pdf">Storey 2010</a>) is <span class="math display">\[
+\text{mFDR} = \frac{\mathrm{E} (\text{true discoveries found})}{\mathrm{E}(\text{total \# discoveries})},
+\]</span> with the convention that when no discoveries are found the mFDR is 0 (e.g. <span class="math inline">\(\frac{0}{0} = 0\)</span>).</p>
+<p>We can in fact prove that the empirical estimator is a moment based estimator for mFDR. Let <span class="math inline">\(\text{fdr}(x_{g})\)</span> denote the local fdr of observation <span class="math inline">\(g\)</span> (which in my case was genes, hence the notation) <span class="math display">\[
+\begin{aligned}
+\text{mFDR}(x) &amp;\approx \frac{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x \cap g \text{ is null}) \big)}{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x) \big)} 
+\notag \\
+&amp;= \frac{\int_{|y| \geq x} (1 - p) f_{0} (y) dy }{\int_{|y| &gt; x} f(y) dy}
+\notag \\
+&amp;= \frac{\int_{|y| \geq x} \frac{(1 - p) f_{0} (y)}{f(y)} f(y) dy}{\int_{|y| \geq x} f(y) dy} .
+\notag \\
+&amp; = \frac{\mathrm{E} \big(\text{fdr}(y) \cdot 1(|y| \geq x) \big)}{\mathrm{E} \big( 1(|y| \geq x) \big)}
+\notag \\
+&amp;\approx \frac{\frac{1}{G} \sum_{g} \text{fdr}(x_{g}) 1 (\text{fdr}(x_{g}) \leq \text{fdr}(x))}{\frac{1}{G} \sum_{g} 1 (\text{fdr}(x_{g}) \leq \text{fdr}(x))} 
+\notag \\
+&amp;
+\notag \\
+&amp;= \overline{\text{fdr}(x_{g}) 1(\text{fdr}(x_{g}) \leq \text{fdr}(x))}.
+\notag
+\end{aligned}
+\]</span></p>
+<p>The advantage for this method is that in some cases the local FDR is easy to compute but the global FDR is difficult. Such I case I encountered in my hierarchical mixture modeling of pooled CRISPR screens. Computing the global FDRs here involves integration over the level sets of a mixture model, which can be difficult. Below is an example of the level sets for when we have 2 guides (measurements) per gene, more guides makes it even more complicated. [levelSets2D.png]</p>
+<p>How well does this do? Let’s do some simulations.</p>
+<div id="simulations" class="section level1">
+<h1>Simulations</h1>
+<div id="d-case" class="section level2">
+<h2>1-D case</h2>
+<p>The simplest case is the one dimensional case. We’ll assume that we have a normal mixture model, <span class="math display">\[
+f(x) \sim (1 - p) \mathcal{N}(0, \sigma_{0}^2) + p \mathcal{N}(\mu, \sigma_{1}^{2}).
+\]</span> We’ll compare two cases, fitting the mixture model and computing the local FDR and global FDR from the empirical method, and the exact method (because it’s easy to compute in this case).</p>
+<pre class="r"><code>set.seed(12345)
+mu0 = 0
+mu1 = 2
+sigma0 = 1
+sigma1 = 1
+p = 0.9
+N = 10000
+labels = rbinom(N, prob = 1 - p, 1)
+mu_vec = sapply(labels, function(i) if(i == 1) mu1 else mu0)
+sigma_vec = sapply(labels, function(i) if(i == 1) sigma1 else sigma0)
+# sanity check
+stopifnot(sum(mu_vec != 0)/length(mu_vec) == sum(labels)/length(labels))
+x = rnorm(N, mean = mu_vec, sd = sigma_vec)</code></pre>
+<pre class="r"><code>mixfit = mixtools::normalmixEM2comp(x, lambda = c(0.5, 0.5), 
+                                    mu = c(0, 1), sigsqrd = c(1, 1))</code></pre>
+<pre><code>## number of iterations= 1000</code></pre>
+<pre class="r"><code>mixfit$lambda</code></pre>
+<pre><code>## [1] 0.6263988 0.3736012</code></pre>
+<pre class="r"><code>mixfit$mu</code></pre>
+<pre><code>## [1] -0.1211857  0.7166598</code></pre>
+<pre class="r"><code>mixfit$sigma</code></pre>
+<pre><code>## [1] 0.9278408 1.3042685</code></pre>
+<pre class="r"><code># taken from https://tinyheero.github.io/2015/10/13/mixture-model.html
+plot_mix_comps &lt;- function(x, mu, sigma, lam) {
+  lam * dnorm(x, mu, sigma)
+}
+library(ggplot2)
+ggplot(data.frame(x = x) ) +
+  geom_histogram(aes(x, ..density..), binwidth = 1, colour = &quot;black&quot;, 
+                 fill = &quot;white&quot;) +
+  stat_function(geom = &quot;line&quot;, fun = plot_mix_comps,
+                args = list(mixfit$mu[1], mixfit$sigma[1], lam = mixfit$lambda[1]),
+                colour = &quot;red&quot;, lwd = 1.5) +
+  stat_function(geom = &quot;line&quot;, fun = plot_mix_comps,
+                args = list(mixfit$mu[2], mixfit$sigma[2], lam = mixfit$lambda[2]),
+                colour = &quot;blue&quot;, lwd = 1.5) +
+  ylab(&quot;Density&quot;) + theme_bw()</code></pre>
+<p><img src="empiricalFDR_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<p>The local FDR here is easy to compute, <span class="math display">\[
+\Pr(g \text{ is null} | x_{g}) = \frac{p f_{1} (x_{g} | \mu_{1}, \sigma_{1})}{(1 - p) f_{0}(x_{g} | \mu_{0}, \sigma_{0}) + p f_{1} (x_{g} | \mu_{1}, \sigma_{1})}.
+\]</span> Similarly the global mFDR is equal to <span class="math display">\[
+mFDR(g) = \frac{\int_{x \geq x_{g}} p f_{1} (x | \mu_{1}, \sigma_{1}) dx}{\int_{x \geq x_{g}} (1 - p) f_{0}(x | \mu_{0}, \sigma_{0}) + p f_{1} (x | \mu_{1}, \sigma_{1}) dx}.
+\]</span> Of course, the global FDR (not marginal) has the integral outside the fraction above, but the above equation is much easier to compute because the integrals can be calculated from the cdf of the normal distribution.</p>
+<pre class="r"><code>normal_2group_loc_fdr &lt;- function(x, p, mu, sigma){
+  # the assumption here is that the null group is the second group
+  stopifnot((length(p) == length(mu)) &amp;
+            (length(mu) == length(sigma)) &amp;
+            (length(sigma) == 2))
+  p0 = p[1]*dnorm(x, mu[1], sigma[1])
+  p1 = p[2]*dnorm(x, mu[2], sigma[2])
+  return(p1/(p0 + p1))
+}
+
+normal_2group_mFDR &lt;- function(x, p, mu, sigma){
+  # the assumption here is that the null group is the second group
+  stopifnot((length(p) == length(mu)) &amp;
+            (length(mu) == length(sigma)) &amp;
+            (length(sigma) == 2))
+  p0 = p[1]*pnorm(x, mu[1], sigma[1], lower.tail = FALSE)
+  p1 = p[2]*pnorm(x, mu[2], sigma[2], lower.tail = FALSE)
+  return(p0/(p0 + p1))
+}</code></pre>
+<p>Now let’s compare the methods. For comparison we will also include the standard Benjamini-Hochberg correct p-value method of computing FDRs.</p>
+<pre class="r"><code>BH_FDR &lt;- function(x, mu0, sigma0){
+  pvals = sapply(x, function(y) pnorm(y, mu0, sigma0, lower.tail = FALSE))
+  return(p.adjust(pvals, method = &quot;BH&quot;))
+}
+
+compare_fdr &lt;- function(x, p, mu, sigma, labels){
+  loc_fdr = sapply(x, function(y) normal_2group_loc_fdr(y, p, mu, sigma))
+  loc_mFDR = sapply(x, function(y) mean(loc_fdr[which(x &gt;= y)]))
+  mFDR = sapply(x, function(y) normal_2group_mFDR(y, p, mu, sigma))
+  bh = BH_FDR(x, mu[1], sigma[1])
+  true_fdr = sapply(1:length(x), function(i) sum(labels[which(x &gt;= x[i])] == 0)/length(which(x &gt;= x[i])))
+  return(data.frame(x = x,
+                    loc_fdr = loc_fdr,
+                    loc_mFDR = 1 - loc_mFDR,
+                    mFDR = mFDR,
+                    BH_FDR = bh,
+                    true_FDR = true_fdr))
+}
+
+normal_2_group_fdr_comparison = compare_fdr(x, mixfit$lambda, mixfit$mu, mixfit$sigma, labels)
+head(normal_2_group_fdr_comparison)</code></pre>
+<pre><code>##            x   loc_fdr  loc_mFDR      mFDR    BH_FDR  true_FDR
+## 1 -0.6924722 0.2224553 0.5882735 0.5876363 0.9353283 0.8777991
+## 2  1.1246956 0.4988124 0.2844968 0.2849966 0.4535784 0.6054628
+## 3  0.1745351 0.2905057 0.4877070 0.4874114 0.7779131 0.8078440
+## 4 -1.9678067 0.2699363 0.6254487 0.6255618 0.9989467 0.9018524
+## 5 -1.6442717 0.2407911 0.6227566 0.6226736 0.9935730 0.8996652
+## 6 -0.1097847 0.2576892 0.5309278 0.5297593 0.8418791 0.8397959</code></pre>
+<pre class="r"><code>df = data.frame(estimated_fdr = c(normal_2_group_fdr_comparison$loc_mFDR, 
+                                  normal_2_group_fdr_comparison$mFDR, 
+                                  normal_2_group_fdr_comparison$BH_FDR), 
+                method = rep(c(&quot;loc_mFDR&quot;, &quot;mFDR&quot;, &quot;BH&quot;), each = N),
+                true_fdr = rep(normal_2_group_fdr_comparison$true_FDR, times = 3))
+ggplot(df, aes(y = true_fdr, x = estimated_fdr, col = method)) + geom_line() + scale_colour_brewer(palette = &quot;Set1&quot;) + theme_bw() + geom_abline(intercept = 0, slope = 1)</code></pre>
+<p><img src="empiricalFDR_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>The empirical method is on-par with exact method, though the Benjamini-Hochberg FDRs show better calibration with the true FDR. Let’s now take a look at the hierarchical model.</p>
+<pre class="r"><code>set.seed(12345)
+n_genes = 10000
+n_guides_per_gene = 5
+genes = rep(1:n_genes, each = n_guides_per_gene)
+x = rep(0, times = length(genes))
+mu0 = 0
+mu1 = 2
+sigma0 = 1
+sigma1 = 1
+p_gene = 0.9
+p_guide = 0.5
+gene_labels = rbinom(n_genes, prob = 1 - p_gene, 1)
+for(i in 1:n_genes){
+  if(gene_labels[i] == 0){
+    x[which(genes == i)] = rnorm(n_guides_per_gene, mean = mu0, sd = sigma0)
+  }
+  else{
+    # gene label == 1
+    guide_labels = rbinom(n_guides_per_gene, prob = 1 - p_guide, 1)
+    mu_vec = sapply(guide_labels, function(i) if(i == 1) mu1 else mu0)
+    sigma_vec = sapply(guide_labels, function(i) if(i == 1) sigma1 else sigma0)
+    x[which(genes == i)] = rnorm(n_guides_per_gene, mean = mu_vec, sd = sigma_vec)
+  }
+}</code></pre>
+<pre class="r"><code>mixfit = mixtools::normalmixEM2comp(x, lambda = c(0.5, 0.5), 
+                                    mu = c(0, 1), sigsqrd = c(1, 1))</code></pre>
+<pre><code>## number of iterations= 1000</code></pre>
+<pre class="r"><code>mixfit$lambda</code></pre>
+<pre><code>## [1] 0.8075129 0.1924871</code></pre>
+<pre class="r"><code>mixfit$mu</code></pre>
+<pre><code>## [1] -0.05286371  0.72474277</code></pre>
+<pre class="r"><code>mixfit$sigma</code></pre>
+<pre><code>## [1] 0.9720461 1.3047024</code></pre>
+<pre class="r"><code># taken from https://tinyheero.github.io/2015/10/13/mixture-model.html
+plot_mix_comps &lt;- function(x, mu, sigma, lam) {
+  lam * dnorm(x, mu, sigma)
+}
+library(ggplot2)
+ggplot(data.frame(x = x) ) +
+  geom_histogram(aes(x, ..density..), binwidth = 1, colour = &quot;black&quot;, 
+                 fill = &quot;white&quot;) +
+  stat_function(geom = &quot;line&quot;, fun = plot_mix_comps,
+                args = list(mixfit$mu[1], mixfit$sigma[1], lam = mixfit$lambda[1]),
+                colour = &quot;red&quot;, lwd = 1.5) +
+  stat_function(geom = &quot;line&quot;, fun = plot_mix_comps,
+                args = list(mixfit$mu[2], mixfit$sigma[2], lam = mixfit$lambda[2]),
+                colour = &quot;blue&quot;, lwd = 1.5) +
+  ylab(&quot;Density&quot;) + theme_bw()</code></pre>
+<p><img src="empiricalFDR_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<p>The hierarchical mixture model has likelihood (see the Methods section of <a href="https://link.springer.com/article/10.1186/s13059-018-1538-6" class="uri">https://link.springer.com/article/10.1186/s13059-018-1538-6</a>) <span class="math display">\[
+\mathcal{L}(f_{0}, f_{1}, p, q | x_{1}, \ldots, x_{n}) = \prod_{g = 1}^{G} (1 - p) \prod_{i: g_{i} = g} f_{0} (x_{i}) + p \prod_{i : g_{i} = g} \big( (1 - q) f_{0} (x_{i}) + q f_{1} (x_{i}) \big).
+\]</span> Because of the non-identifiability of <span class="math inline">\(p\)</span> and <span class="math inline">\(q\)</span> simultaneously, we marginalized over <span class="math inline">\(q\)</span> (with a uniform prior) to obtain gene-level local false discovery rates <span class="math display">\[
+\text{locfdr}(g) = \int_{0}^{1} \frac{(\hat{\tau} / q) \prod_{i: g_{i} = g} q f_{1} (x_{i}) + (1 - q) f_{0} (x_{i}) }{(\hat{\tau} / q) \prod_{i: g_{i} = g} \big(  q f_{1} (x_{i}) + (1 - q) f_{0} (x_{i})  \big) + (1 - \hat{\tau} / q) \prod_{i: g_{i} = g} f_{0} (x_{i})} d q.
+\]</span> We then used the empirical FDR estimator to compute estimates for the global false discovery rates.</p>
+<pre class="r"><code>crisphiermixFit = CRISPhieRmix::CRISPhieRmix(x = x, geneIds = genes, 
+                                             pq = 0.1, mu = 4, sigma = 1,
+                                             nMesh = 100,  BIMODAL = FALSE,
+                                             VERBOSE = TRUE, PLOT = TRUE,
+                                             screenType = &quot;GOF&quot;)</code></pre>
+<pre><code>## no negative controls provided, fitting hierarchical normal model</code></pre>
+<pre><code>## Loading required package: mixtools</code></pre>
+<pre><code>## mixtools package, version 1.2.0, Released 2020-02-05
+## This package is based upon work supported by the National Science Foundation under Grant No. SES-0518772.</code></pre>
+<pre><code>## WARNING! NOT CONVERGENT! 
+## number of iterations= 1000</code></pre>
+<p><img src="empiricalFDR_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<pre class="r"><code>crisphiermixFit$mixFit$lambda</code></pre>
+<pre><code>## [1] 0.95278182 0.04721818</code></pre>
+<pre class="r"><code>crisphiermixFit$mixFit$mu</code></pre>
+<pre><code>## [1] 0.004446553 1.960693489</code></pre>
+<pre class="r"><code>crisphiermixFit$mixFit$sigma</code></pre>
+<pre><code>## [1] 1.005094 1.028718</code></pre>
+<pre class="r"><code>null_pvals = sapply(1:n_genes, function(g) t.test(x[which(genes == g)], alternative = &quot;greater&quot;, mu = crisphiermixFit$mixFit$mu[1])$p.value)
+bh_fdr = data.frame(estimated_FDR = p.adjust(null_pvals, method = &quot;fdr&quot;),
+                    pvals = null_pvals)
+bh_fdr[&#39;true_fdr&#39;] = sapply(bh_fdr$estimated_FDR, function(p) sum(gene_labels[which(bh_fdr$estimated_FDR &lt;= p)] == 0)/sum(bh_fdr$estimated_FDR &lt;= p))
+head(bh_fdr)</code></pre>
+<pre><code>##   estimated_FDR     pvals  true_fdr
+## 1     0.9795228 0.8252480 0.8871217
+## 2     0.9390381 0.5319651 0.8395410
+## 3     0.9797612 0.8294592 0.8880518
+## 4     0.9857013 0.8827119 0.8933676
+## 5     0.9470087 0.6006585 0.8558586
+## 6     0.7356476 0.1166486 0.6505949</code></pre>
+<pre class="r"><code>crisphiermixFDR = data.frame(estimated_FDR = crisphiermixFit$FDR)
+crisphiermixFDR[&#39;true_fdr&#39;] = sapply(crisphiermixFDR$estimated_FDR, function(p) sum(gene_labels[which(crisphiermixFDR$estimated_FDR &lt;= p)] == 0)/sum(crisphiermixFDR$estimated_FDR &lt;= p))
+head(crisphiermixFDR)</code></pre>
+<pre><code>##   estimated_FDR  true_fdr
+## 1     0.8063019 0.8621093
+## 2     0.8068114 0.8626709
+## 3     0.8352201 0.8919991
+## 4     0.8385534 0.8952391
+## 5     0.7792940 0.8341960
+## 6     0.6835582 0.7305573</code></pre>
+<pre class="r"><code>cols = RColorBrewer::brewer.pal(8, &#39;Set1&#39;)
+df = data.frame(estimated_FDR = c(crisphiermixFDR$estimated_FDR, bh_fdr$estimated_FDR),
+                true_FDR = c(crisphiermixFDR$true_fdr, bh_fdr$true_fdr),
+                method = rep(c(&quot;empirical FDR&quot;, &quot;BH FDR&quot;), each = dim(crisphiermixFDR)[1]))
+ggplot(df, aes(y = true_FDR, x = estimated_FDR, col = method)) + geom_line() + theme_bw() + scale_colour_brewer(palette = &quot;Set1&quot;) + geom_abline(intercept = 0, slope = 1)</code></pre>
+<p><img src="empiricalFDR_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p>What’s happening with the Benjamini-Hochberg FDRs? Why aren’t many lower than 0.3?</p>
+<pre class="r"><code>head(bh_fdr[which(bh_fdr$estimated_FDR &lt; 0.3), ])</code></pre>
+<pre><code>##      estimated_FDR        pvals  true_fdr
+## 20       0.2548441 0.0002241322 0.1764706
+## 1069     0.2548441 0.0004236029 0.1764706
+## 2342     0.2548441 0.0001856662 0.1764706
+## 2750     0.2548441 0.0002576694 0.1764706
+## 2897     0.2548441 0.0001255965 0.1764706
+## 3433     0.2548441 0.0002680069 0.1764706</code></pre>
+<p>We see that the Benjamini-Hochberg-corrected <span class="math inline">\(t\)</span>-test is not powerful enough to give meaningful insight into low false discovery rate region. Though, the rest of the region is well-calibrated. However, we see that the empirical estimator of the FDR is very well calibrated. At least in this case when the model is correctly specified. An argument could be made that the empirical estimator has the advantage of knowing the correct model, but that would lead the BH FDRs to not be calibrated and not what we see here.</p>
+</div>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+</script>
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
