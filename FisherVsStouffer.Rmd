@@ -196,7 +196,9 @@ long_tailed_empirical_fdr['stouffer'] = long_tailed_empirical_fdr['fdr_thresh'].
 df = pd.DataFrame({'estimated_fdr': long_tailed_empirical_fdr['fdr_thresh'].tolist() + long_tailed_empirical_fdr['fdr_thresh'].tolist(), 
                    'empirical_fdr': long_tailed_empirical_fdr['fisher'].tolist() + long_tailed_empirical_fdr['stouffer'].tolist(),
                    'condition': ['fisher']*long_tailed_empirical_fdr.shape[0] + ['stouffer']*long_tailed_empirical_fdr.shape[0]})
+```
 
+```{python}
 plt.plot([0, 1], [0, 1], '--', color = 'black')
 seaborn.lineplot(x = 'estimated_fdr', y = 'empirical_fdr', hue = 'condition', data = df)
 plt.show()

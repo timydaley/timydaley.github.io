@@ -530,7 +530,7 @@ empirical_fdr.head()</code></pre>
                    &#39;condition&#39;: [&#39;fisher&#39;]*empirical_fdr.shape[0] + [&#39;stouffer&#39;]*empirical_fdr.shape[0]})
 
 plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7f8f3ae3f970&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fc3da6ae970&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
@@ -566,14 +566,13 @@ long_tailed_empirical_fdr[&#39;stouffer&#39;] = long_tailed_empirical_fdr[&#39;f
 
 df = pd.DataFrame({&#39;estimated_fdr&#39;: long_tailed_empirical_fdr[&#39;fdr_thresh&#39;].tolist() + long_tailed_empirical_fdr[&#39;fdr_thresh&#39;].tolist(), 
                    &#39;empirical_fdr&#39;: long_tailed_empirical_fdr[&#39;fisher&#39;].tolist() + long_tailed_empirical_fdr[&#39;stouffer&#39;].tolist(),
-                   &#39;condition&#39;: [&#39;fisher&#39;]*long_tailed_empirical_fdr.shape[0] + [&#39;stouffer&#39;]*long_tailed_empirical_fdr.shape[0]})
-
-plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7f8ef832f8e0&gt;]</code></pre>
+                   &#39;condition&#39;: [&#39;fisher&#39;]*long_tailed_empirical_fdr.shape[0] + [&#39;stouffer&#39;]*long_tailed_empirical_fdr.shape[0]})</code></pre>
+<pre class="python"><code>plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fc3c06cd430&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
 <p>We see here that Fisher’s method is much more susceptible to false positives in the presence of long tails. If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified. Therefore, this little experiment clearly indicates that there can be significant benefits to using Stouffer’s method in place of Fisher’s method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model.</p>
 </div>
 </div>
