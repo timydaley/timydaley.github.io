@@ -1,10 +1,12 @@
 ---
-title: "A collection of poorly-executed thoughts and essays"
+title: "A collection of thoughts and essays about statistics"
 author:  "[Timothy Daley](https://timydaley.github.io/)"
 output:
   html_document:
     fig_width: 1
 ---
+
+Disclaimer: These essays represent my personal views and are not reflective of the views of my current or past employers.
 
 ----
 

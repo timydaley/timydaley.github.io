@@ -11,13 +11,13 @@ output:
     toc_float: yes
 ---
 
-The most common way to coalesce $p$-values is Fisher's method (https://en.wikipedia.org/wiki/Fisher%27s_method).   For $p$-values $p_{1}, \ldots, p_{n}$, Fisher's method calculates the combined test statistic as 
+The most common way to coalesce $p$-values is Fisher's method (https://en.wikipedia.org/wiki/Fisher%27s_method).   The basic idea is to log transform your $p$-values, then $-2$ times the sum is chi-square distributed.  Specifically, for $p$-values $p_{1}, \ldots, p_{n}$, Fisher's method calculates the combined test statistic as 
 $$
 t_{\text{Fisher}} = -2 \sum_{i = 1}^{n} \log p_{i}.
 $$
-Under the null that the $p$-values are independent uniformly distributed, the $t_{\text{Fisher}}$ will be $\chi^{2}_{2n}$ distributed.  The common wisdom is that Fisher's method tend to values low p-values instead of consistent values.
+Under the null that the $p$-values are independent uniformly distributed, the test statistic $t_{\text{Fisher}}$ will be $\chi^{2}_{2n}$ distributed.  The common wisdom is that Fisher's method tend to values low p-values, instead of consistently low $p$-values.
 
-An alternative to Fisher's method is Stouffer's method.  The idea is to transform the $p$-values to $z$-scores, then compute a combined $z$-score from the individual $z$-scores.  E.g. if $\Phi(\cdot)$ is the standard normal cdf, then the test statistic is 
+An alternative to Fisher's method is Stouffer's method.  The idea is to transform the $p$-values to $z$-scores, then compute a combined $z$-score by averaging the individual $z$-scores.  E.g. if $\Phi(\cdot)$ is the standard normal cdf, then the test statistic is 
 $$
 t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \Phi^{-1} (p_{i}).
 $$
@@ -25,13 +25,13 @@ Under the null this is distributed as a negative standard normal variable (negat
 $$
 t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \text{sign}(x_{i}) \Phi^{-1} (p_{i})
 $$
-as the test statistic so that effect sizes ($x_{i}$) of the same sign are valued.  This has a null distribution of standard normal.  
+as the test statistic so that effect sizes ($x_{i}$) of the same sign are valued.  This has a null distribution of standard normal. 
 
 Let's take a look at how the two methods compare when in the presence of long tails in the null.  I expect that Fisher's method will have higher false positive in the presence of long tails.  
 
 # Simulation
 
-The simulation I'll run is the standard 2-groups model.  For aggregation purposes, we'll have 5 effect sizes to merge.  In real applications, the individual effect sizes and $p$-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes). 
+The simulation I'll run is the standard 2-groups model (e.g. see [Efron 2008](https://projecteuclid.org/download/pdfview_1/euclid.ss/1215441276)).  For aggregation purposes, we'll have 5 effect sizes (I'm leaving effect size undefined on purpose) to merge.  In real applications, the individual effect sizes  and $p$-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes). 
 
 ```{r setup}
 library(reticulate)
@@ -69,18 +69,17 @@ You can see the long tail on the right is the gene effects.  Now let's assume 5 
 
 ```{python}
 import itertools
+import pandas as pd
+
 lst = range(n_genes)
 guide2gene_map = list(itertools.chain.from_iterable(itertools.repeat(x, 5) for x in lst))
 n_guides = 5*n_genes
 assert(len(guide2gene_map) == n_guides)
-```
 
-```{python}
-import pandas as pd
 guide_effects = pd.DataFrame({'guide2gene': guide2gene_map})
 guide_effects['guide_effect'] = guide_effects['guide2gene'].map(lambda i: np.random.normal(loc = gene_effects[i], scale = 1))
 guide_effects['label'] = guide_effects['guide2gene'].map(lambda i: gene_labels[i])
-seaborn.histplot(x = 'guide_effect', hue = 'label', data = guide_effects)
+seaborn.histplot(x = 'guide_effect', hue = 'label', data = guide_effects).set_title('guide effect distribution')
 ```
 
 Now let's look at combining $p$-values with Fisher vs Stouffer.
@@ -91,11 +90,12 @@ from math import sqrt
 
 def stouffer_pval(z):
   stouffer_zval = sum(z)/sqrt(len(z))
-  stouffer_pval = 2*norm.cdf(-np.abs(stouffer_zval))
+  stouffer_pval = norm.cdf(-stouffer_zval)
   return stouffer_pval
 
 def fisher_pval(z):
-  pvals = 2*norm.cdf(-np.abs(z))
+  # 1-sided p-val
+  pvals = norm.cdf(-z)
   fisher_val = -2*sum(np.log(pvals))
   fisher_pval = 1.0 - chi2.cdf(fisher_val, df = 2*len(z))
   return fisher_pval
@@ -202,4 +202,4 @@ seaborn.lineplot(x = 'estimated_fdr', y = 'empirical_fdr', hue = 'condition', da
 plt.show()
 ```
 
-We see here that Fisher's method is much more susceptible to false positives in the presence of long tails.  If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified.  Therefore, this indicates that there can be significant benefits to using Stouffer's method in place of Fisher's method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model. 
+We see here that Fisher's method is much more susceptible to false positives in the presence of long tails.  If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified.  Therefore, this little experiment clearly indicates that there can be significant benefits to using Stouffer's method in place of Fisher's method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model. 

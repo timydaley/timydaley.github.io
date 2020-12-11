@@ -397,10 +397,10 @@ div.tocify {
 </div>
 
 
-<p>The most common way to coalesce <span class="math inline">\(p\)</span>-values is Fisher’s method (<a href="https://en.wikipedia.org/wiki/Fisher%27s_method" class="uri">https://en.wikipedia.org/wiki/Fisher%27s_method</a>). For <span class="math inline">\(p\)</span>-values <span class="math inline">\(p_{1}, \ldots, p_{n}\)</span>, Fisher’s method calculates the combined test statistic as <span class="math display">\[
+<p>The most common way to coalesce <span class="math inline">\(p\)</span>-values is Fisher’s method (<a href="https://en.wikipedia.org/wiki/Fisher%27s_method" class="uri">https://en.wikipedia.org/wiki/Fisher%27s_method</a>). The basic idea is to log transform your <span class="math inline">\(p\)</span>-values, then <span class="math inline">\(-2\)</span> times the sum is chi-square distributed. Specifically, for <span class="math inline">\(p\)</span>-values <span class="math inline">\(p_{1}, \ldots, p_{n}\)</span>, Fisher’s method calculates the combined test statistic as <span class="math display">\[
 t_{\text{Fisher}} = -2 \sum_{i = 1}^{n} \log p_{i}.
-\]</span> Under the null that the <span class="math inline">\(p\)</span>-values are independent uniformly distributed, the <span class="math inline">\(t_{\text{Fisher}}\)</span> will be <span class="math inline">\(\chi^{2}_{2n}\)</span> distributed. The common wisdom is that Fisher’s method tend to values low p-values instead of consistent values.</p>
-<p>An alternative to Fisher’s method is Stouffer’s method. The idea is to transform the <span class="math inline">\(p\)</span>-values to <span class="math inline">\(z\)</span>-scores, then compute a combined <span class="math inline">\(z\)</span>-score from the individual <span class="math inline">\(z\)</span>-scores. E.g. if <span class="math inline">\(\Phi(\cdot)\)</span> is the standard normal cdf, then the test statistic is <span class="math display">\[
+\]</span> Under the null that the <span class="math inline">\(p\)</span>-values are independent uniformly distributed, the test statistic <span class="math inline">\(t_{\text{Fisher}}\)</span> will be <span class="math inline">\(\chi^{2}_{2n}\)</span> distributed. The common wisdom is that Fisher’s method tend to values low p-values, instead of consistently low <span class="math inline">\(p\)</span>-values.</p>
+<p>An alternative to Fisher’s method is Stouffer’s method. The idea is to transform the <span class="math inline">\(p\)</span>-values to <span class="math inline">\(z\)</span>-scores, then compute a combined <span class="math inline">\(z\)</span>-score by averaging the individual <span class="math inline">\(z\)</span>-scores. E.g. if <span class="math inline">\(\Phi(\cdot)\)</span> is the standard normal cdf, then the test statistic is <span class="math display">\[
 t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \Phi^{-1} (p_{i}).
 \]</span> Under the null this is distributed as a negative standard normal variable (negative because <span class="math inline">\(\Phi^{-1}\)</span> of small <span class="math inline">\(p\)</span>-values will be less than zero). The prevailing wisdom is that this method values consistently small <span class="math inline">\(p\)</span>-values. To ensure that effects have the same sign, we can define <span class="math display">\[
 t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \text{sign}(x_{i}) \Phi^{-1} (p_{i})
@@ -408,7 +408,7 @@ t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \text{sign}(x_{i}) \Ph
 <p>Let’s take a look at how the two methods compare when in the presence of long tails in the null. I expect that Fisher’s method will have higher false positive in the presence of long tails.</p>
 <div id="simulation" class="section level1">
 <h1>Simulation</h1>
-<p>The simulation I’ll run is the standard 2-groups model. For aggregation purposes, we’ll have 5 effect sizes to merge. In real applications, the individual effect sizes and <span class="math inline">\(p\)</span>-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes).</p>
+<p>The simulation I’ll run is the standard 2-groups model (e.g. see <a href="https://projecteuclid.org/download/pdfview_1/euclid.ss/1215441276">Efron 2008</a>). For aggregation purposes, we’ll have 5 effect sizes (I’m leaving effect size undefined on purpose) to merge. In real applications, the individual effect sizes and <span class="math inline">\(p\)</span>-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes).</p>
 <pre class="r"><code>library(reticulate)
 # you need to edit RETICULATE_PYTHON in .Renviron
 # for some reason I need to make a venv for each project
@@ -435,27 +435,30 @@ seaborn.histplot(gene_effects, color = &#39;black&#39;)</code></pre>
 <p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
 <p>You can see the long tail on the right is the gene effects. Now let’s assume 5 observations (guide RNAs) per gene. These are gonna be normally distributed with mean equal to gene effect size, and standard deviation 1.</p>
 <pre class="python"><code>import itertools
+import pandas as pd
+
 lst = range(n_genes)
 guide2gene_map = list(itertools.chain.from_iterable(itertools.repeat(x, 5) for x in lst))
 n_guides = 5*n_genes
-assert(len(guide2gene_map) == n_guides)</code></pre>
-<pre class="python"><code>import pandas as pd
+assert(len(guide2gene_map) == n_guides)
+
 guide_effects = pd.DataFrame({&#39;guide2gene&#39;: guide2gene_map})
 guide_effects[&#39;guide_effect&#39;] = guide_effects[&#39;guide2gene&#39;].map(lambda i: np.random.normal(loc = gene_effects[i], scale = 1))
 guide_effects[&#39;label&#39;] = guide_effects[&#39;guide2gene&#39;].map(lambda i: gene_labels[i])
-seaborn.histplot(x = &#39;guide_effect&#39;, hue = &#39;label&#39;, data = guide_effects)</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+seaborn.histplot(x = &#39;guide_effect&#39;, hue = &#39;label&#39;, data = guide_effects).set_title(&#39;guide effect distribution&#39;)</code></pre>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
 <p>Now let’s look at combining <span class="math inline">\(p\)</span>-values with Fisher vs Stouffer.</p>
 <pre class="python"><code>from scipy.stats import norm, chi2
 from math import sqrt
 
 def stouffer_pval(z):
   stouffer_zval = sum(z)/sqrt(len(z))
-  stouffer_pval = 2*norm.cdf(-np.abs(stouffer_zval))
+  stouffer_pval = norm.cdf(-stouffer_zval)
   return stouffer_pval
 
 def fisher_pval(z):
-  pvals = 2*norm.cdf(-np.abs(z))
+  # 1-sided p-val
+  pvals = norm.cdf(-z)
   fisher_val = -2*sum(np.log(pvals))
   fisher_pval = 1.0 - chi2.cdf(fisher_val, df = 2*len(z))
   return fisher_pval
@@ -468,18 +471,18 @@ gene_pvals[&#39;stouffer&#39;] = gene_pvals[&#39;gene&#39;].map(lambda i: stouff
 
 gene_pvals.head()</code></pre>
 <pre><code>##    gene  gene_label    fisher  stouffer
-## 0     0           0  0.830681  0.982527
-## 1     1           0  0.478896  0.263388
-## 2     2           0  0.855862  0.759923
-## 3     3           0  0.305149  0.892668
-## 4     4           0  0.241290  0.915233</code></pre>
+## 0     0           0  0.620273  0.508737
+## 1     1           0  0.873517  0.868306
+## 2     2           0  0.509792  0.379961
+## 3     3           0  0.372420  0.446334
+## 4     4           0  0.398732  0.542383</code></pre>
 <pre class="python"><code>import matplotlib.pyplot as plt
 seaborn.histplot(gene_pvals[&#39;fisher&#39;], bins = 30, color = &#39;black&#39;, label = &#39;Fisher p-vals&#39;)
 plt.show()</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <pre class="python"><code>seaborn.histplot(gene_pvals[&#39;stouffer&#39;], bins = 30, color = &#39;black&#39;, label = &#39;Stouffer p-vals&#39;)
 plt.show()</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-6-2.png" width="672" /></p>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-5-2.png" width="672" /></p>
 <p>Now let’s compute Benjamini-Hochberg FDRs and compare them to the empirical FDR.</p>
 <pre class="python"><code>from statsmodels.stats.multitest import fdrcorrection
 
@@ -489,11 +492,11 @@ _, gene_pvals[&#39;stouffer_fdr&#39;] = fdrcorrection(gene_pvals[&#39;stouffer&#
 
 gene_pvals.head()</code></pre>
 <pre><code>##    gene  gene_label    fisher  stouffer  fisher_fdr  stouffer_fdr
-## 0     0           0  0.830681  0.982527    0.990509      0.998450
-## 1     1           0  0.478896  0.263388    0.951452      0.874023
-## 2     2           0  0.855862  0.759923    0.992492      0.980158
-## 3     3           0  0.305149  0.892668    0.900992      0.994393
-## 4     4           0  0.241290  0.915233    0.872839      0.996570</code></pre>
+## 0     0           0  0.620273  0.508737    0.970138      0.953773
+## 1     1           0  0.873517  0.868306    0.990323      0.991374
+## 2     2           0  0.509792  0.379961    0.956906      0.921007
+## 3     3           0  0.372420  0.446334    0.920225      0.940338
+## 4     4           0  0.398732  0.542383    0.926149      0.956265</code></pre>
 <p>Now let’s compute the empirical FDRs.</p>
 <pre class="python"><code>def compute_empirical_fdr(labels, fdrs, fdr_thresh):
   mask = (fdrs &lt; fdr_thresh)
@@ -511,27 +514,27 @@ empirical_fdr[&#39;stouffer&#39;] = empirical_fdr[&#39;fdr_thresh&#39;].map(lamb
 empirical_fdr.head()</code></pre>
 <pre><code>##    fdr_thresh    fisher  stouffer
 ## 0    0.000000  0.000000  0.000000
-## 1    0.001001  0.000000  0.002281
-## 2    0.002002  0.001220  0.003356
-## 3    0.003003  0.002392  0.005507
-## 4    0.004004  0.004739  0.008734</code></pre>
+## 1    0.001001  0.001147  0.001121
+## 2    0.002002  0.002227  0.003293
+## 3    0.003003  0.004410  0.004362
+## 4    0.004004  0.007650  0.007559</code></pre>
 <pre class="python"><code>empirical_fdr.tail()</code></pre>
 <pre><code>##      fdr_thresh    fisher  stouffer
-## 995    0.995996  0.942669  0.943560
-## 996    0.996997  0.942908  0.944636
-## 997    0.997998  0.947814  0.947671
-## 998    0.998999  0.948307  0.948263
+## 995    0.995996  0.945746  0.945044
+## 996    0.996997  0.946220  0.945427
+## 997    0.997998  0.948362  0.947968
+## 998    0.998999  0.948434  0.948398
 ## 999    1.000000  0.948550  0.948550</code></pre>
 <pre class="python"><code>df = pd.DataFrame({&#39;estimated_fdr&#39;: empirical_fdr[&#39;fdr_thresh&#39;].tolist() + empirical_fdr[&#39;fdr_thresh&#39;].tolist(), 
                    &#39;empirical_fdr&#39;: empirical_fdr[&#39;fisher&#39;].tolist() + empirical_fdr[&#39;stouffer&#39;].tolist(),
                    &#39;condition&#39;: [&#39;fisher&#39;]*empirical_fdr.shape[0] + [&#39;stouffer&#39;]*empirical_fdr.shape[0]})
 
 plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fd949e0c4f0&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7f8f3ae3f970&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
 </div>
 <div id="long-tail" class="section level2">
 <h2>Long tail</h2>
@@ -547,7 +550,7 @@ long_tailed_guide_effects[&#39;label&#39;] = long_tailed_guide_effects[&#39;guid
 seaborn.histplot(x = &#39;guide_effect&#39;, hue = &#39;label&#39;, data = long_tailed_guide_effects)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;guide_effect&#39;, ylabel=&#39;Count&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
 <pre class="python"><code>long_tailed_gene_pvals = pd.DataFrame({&#39;gene&#39;: range(n_genes),
                            &#39;gene_label&#39;: gene_labels})
                            
@@ -566,12 +569,12 @@ df = pd.DataFrame({&#39;estimated_fdr&#39;: long_tailed_empirical_fdr[&#39;fdr_t
                    &#39;condition&#39;: [&#39;fisher&#39;]*long_tailed_empirical_fdr.shape[0] + [&#39;stouffer&#39;]*long_tailed_empirical_fdr.shape[0]})
 
 plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fd989b728b0&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7f8ef832f8e0&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
-<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
-<p>We see here that Fisher’s method is much more susceptible to false positives in the presence of long tails. If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified. Therefore, this indicates that there can be significant benefits to using Stouffer’s method in place of Fisher’s method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model.</p>
+<p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
+<p>We see here that Fisher’s method is much more susceptible to false positives in the presence of long tails. If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified. Therefore, this little experiment clearly indicates that there can be significant benefits to using Stouffer’s method in place of Fisher’s method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model.</p>
 </div>
 </div>
 
