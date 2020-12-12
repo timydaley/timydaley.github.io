@@ -367,9 +367,6 @@ div.tocify {
         <li>
   <a href="FisherVsStouffer.html">Fisher vs Stouffer</a>
 </li>
-<li>
-  <a href="empiricalFDR.html">emprical estimation of the global FDR</a>
-</li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
         
@@ -405,10 +402,10 @@ t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \Phi^{-1} (p_{i}).
 \]</span> Under the null this is distributed as a negative standard normal variable (negative because <span class="math inline">\(\Phi^{-1}\)</span> of small <span class="math inline">\(p\)</span>-values will be less than zero). The prevailing wisdom is that this method values consistently small <span class="math inline">\(p\)</span>-values. To ensure that effects have the same sign, we can define <span class="math display">\[
 t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \text{sign}(x_{i}) \Phi^{-1} (p_{i})
 \]</span> as the test statistic so that effect sizes (<span class="math inline">\(x_{i}\)</span>) of the same sign are valued. This has a null distribution of standard normal.</p>
-<p>Let’s take a look at how the two methods compare when in the presence of long tails in the null. I expect that Fisher’s method will have higher false positive in the presence of long tails.</p>
+<p>I first learned about Stouffer’s method through a <a href="https://projecteuclid.org/download/pdfview_1/euclid.aos/1256303530">paper by Art Owen</a> which discusses different meta-analysis techniques. In particular, he says “In the Fisher test, if the first <span class="math inline">\(m−1\)</span> <span class="math inline">\(p\)</span>-values already yield a test statistic exceeding the <span class="math inline">\(\chi^2_{2m}\)</span> significance threshold, then the <span class="math inline">\(m\)</span>th test statistic cannot undo it. The Stouffer test is different. Any large but finite value of <span class="math inline">\(\sum_{j = 1}^{m-1} \Phi^{-1}(p_{j})\)</span> can be canceled by an opposing value of <span class="math inline">\(\Phi^{-1}(p_{m})\)</span>.” Thus indicating that Stouffer’s method will tend to pick up more small but consistent effects, and will be more robust in the presence of rare outliers. On the other hand, because Fisher’s method can be significant due to just one very small <span class="math inline">\(p\)</span>-value then it is likely not as robust to outliers. To test this let’s compare the methods in two situations: small-tailed null and long-tailed null, where the latter will simulate the presence of outlier effects. I expect that Fisher’s method will have higher false positive in the presence of long tails.</p>
 <div id="simulation" class="section level1">
 <h1>Simulation</h1>
-<p>The simulation I’ll run is the standard 2-groups model (e.g. see <a href="https://projecteuclid.org/download/pdfview_1/euclid.ss/1215441276">Efron 2008</a>). For aggregation purposes, we’ll have 5 effect sizes (I’m leaving effect size undefined on purpose) to merge. In real applications, the individual effect sizes and <span class="math inline">\(p\)</span>-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes).</p>
+<p>The simulation I’ll run is the standard 2-groups model (e.g. see <a href="https://projecteuclid.org/download/pdfview_1/euclid.ss/1215441276">Efron 2008</a>). For aggregation purposes, we’ll have 5 effect sizes (I’m leaving effect size undefined on purpose) to merge. In the motivating application, the individual effect sizes and <span class="math inline">\(p\)</span>-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes). Consistent effects are not guaranteed because of variable guide efficiency (e.g. see <a href="https://link.springer.com/article/10.1186/s13059-018-1538-6">my previous paper on this topic</a>).</p>
 <pre class="r"><code>library(reticulate)
 # you need to edit RETICULATE_PYTHON in .Renviron
 # for some reason I need to make a venv for each project
@@ -530,7 +527,7 @@ empirical_fdr.head()</code></pre>
                    &#39;condition&#39;: [&#39;fisher&#39;]*empirical_fdr.shape[0] + [&#39;stouffer&#39;]*empirical_fdr.shape[0]})
 
 plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fc3da6ae970&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fbdb8ee7970&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
@@ -568,12 +565,12 @@ df = pd.DataFrame({&#39;estimated_fdr&#39;: long_tailed_empirical_fdr[&#39;fdr_t
                    &#39;empirical_fdr&#39;: long_tailed_empirical_fdr[&#39;fisher&#39;].tolist() + long_tailed_empirical_fdr[&#39;stouffer&#39;].tolist(),
                    &#39;condition&#39;: [&#39;fisher&#39;]*long_tailed_empirical_fdr.shape[0] + [&#39;stouffer&#39;]*long_tailed_empirical_fdr.shape[0]})</code></pre>
 <pre class="python"><code>plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fc3c06cd430&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fbdc04e5430&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
 <p><img src="FisherVsStouffer_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
-<p>We see here that Fisher’s method is much more susceptible to false positives in the presence of long tails. If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified. Therefore, this little experiment clearly indicates that there can be significant benefits to using Stouffer’s method in place of Fisher’s method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model.</p>
+<p>We see here that Fisher’s method has a higher false positive rate, particularly in the lower region where we usually set the false discovery rate. This inidicates that Fisher’s method is much more susceptible to false positives in the presence of long tails. If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified. Therefore, this simple experiment indicates that there can be significant benefits to using Stouffer’s method in place of Fisher’s method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model.</p>
 </div>
 </div>
 

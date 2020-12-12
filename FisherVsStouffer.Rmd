@@ -27,11 +27,13 @@ t_{\text{Stouffer}} = \frac{1}{\sqrt{k}} \sum_{i = 1}^{n} \text{sign}(x_{i}) \Ph
 $$
 as the test statistic so that effect sizes ($x_{i}$) of the same sign are valued.  This has a null distribution of standard normal. 
 
-Let's take a look at how the two methods compare when in the presence of long tails in the null.  I expect that Fisher's method will have higher false positive in the presence of long tails.  
+I first learned about Stouffer's method through a [paper by Art Owen](https://projecteuclid.org/download/pdfview_1/euclid.aos/1256303530) which discusses different meta-analysis techniques.  In particular, he says "In the Fisher test, if the first
+$m−1$ $p$-values already yield a test statistic exceeding the $\chi^2_{2m}$ significance threshold, then the $m$th test statistic cannot undo it. The Stouffer test is different. Any
+large but finite value of $\sum_{j = 1}^{m-1} \Phi^{-1}(p_{j})$ can be canceled by an opposing value of $\Phi^{-1}(p_{m})$."  Thus indicating that Stouffer's method will tend to pick up more small but consistent effects, and will be more robust in the presence of rare outliers.  On the other hand, because Fisher's method can be significant due to just one very small $p$-value then it is likely not as robust to outliers.  To test this let's compare the methods in two situations: small-tailed null and long-tailed null, where the latter will simulate the presence of outlier effects. I expect that Fisher's method will have higher false positive in the presence of long tails.  
 
 # Simulation
 
-The simulation I'll run is the standard 2-groups model (e.g. see [Efron 2008](https://projecteuclid.org/download/pdfview_1/euclid.ss/1215441276)).  For aggregation purposes, we'll have 5 effect sizes (I'm leaving effect size undefined on purpose) to merge.  In real applications, the individual effect sizes  and $p$-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes). 
+The simulation I'll run is the standard 2-groups model (e.g. see [Efron 2008](https://projecteuclid.org/download/pdfview_1/euclid.ss/1215441276)).  For aggregation purposes, we'll have 5 effect sizes (I'm leaving effect size undefined on purpose) to merge.  In the motivating application, the individual effect sizes  and $p$-values arise from differential expression analysis of guide RNAs, with aggregation done at the gene level (as guide RNAs target specific genes).  Consistent effects are not guaranteed because of variable guide efficiency (e.g. see [my previous paper on this topic](https://link.springer.com/article/10.1186/s13059-018-1538-6)).
 
 ```{r setup}
 library(reticulate)
@@ -204,4 +206,4 @@ seaborn.lineplot(x = 'estimated_fdr', y = 'empirical_fdr', hue = 'condition', da
 plt.show()
 ```
 
-We see here that Fisher's method is much more susceptible to false positives in the presence of long tails.  If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified.  Therefore, this little experiment clearly indicates that there can be significant benefits to using Stouffer's method in place of Fisher's method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model. 
+We see here that Fisher's method has a higher false positive rate, particularly in the lower region where we usually set the false discovery rate.  This inidicates that Fisher's method is much more susceptible to false positives in the presence of long tails.  If we correctly specify the null model, then this will be less of an issue, but we saw above that both methods perform similarly when the model is correctly specified.  Therefore, this simple experiment indicates that there can be significant benefits to using Stouffer's method in place of Fisher's method, particularly when long-tailed or off-target effects can be present in the null distribution and are difficult to accurately model. 
