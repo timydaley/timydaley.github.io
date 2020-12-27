@@ -4,6 +4,8 @@ navbar:
   left:
     - text: "Fisher vs Stouffer"
       href: FisherVsStouffer.html
+    - text: "2 groups"
+      href: twoGroupsBackground.html
 output_dir: "."
 output:
   html_document:

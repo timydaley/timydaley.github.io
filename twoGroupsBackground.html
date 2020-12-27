@@ -11,8 +11,9 @@
 
 <meta name="author" content="Timothy Daley" />
 
+<meta name="date" content="2020-12-27" />
 
-<title>A collection of thoughts and essays about statistics</title>
+<title>Background of two groups model</title>
 
 <script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -286,9 +287,6 @@ $(document).ready(function () {
         <li>
   <a href="FisherVsStouffer.html">Fisher vs Stouffer</a>
 </li>
-<li>
-  <a href="twoGroupsBackground.html">2 groups</a>
-</li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
         
@@ -301,15 +299,29 @@ $(document).ready(function () {
 
 
 
-<h1 class="title toc-ignore">A collection of thoughts and essays about statistics</h1>
-<h4 class="author"><a href="https://timydaley.github.io/">Timothy Daley</a></h4>
+<h1 class="title toc-ignore">Background of two groups model</h1>
+<h4 class="author">Timothy Daley</h4>
+<h4 class="date">12/27/2020</h4>
 
 </div>
 
 
-<p>This is a collection of blogs about statistics and statistical learning, usually centered around biological applications.</p>
-<p><sub><sup> Disclaimer: These essays represent my personal views and are not reflective of the views of my current or past employers. </sup></sub></p>
-<hr />
+<p>A common trope in genomics is the two groups model. You have a large group of measurement, at least in the thousands, and usually more. The objective of the analysis is to identify a group of “interesting” examples from the group of measurements. Some examples:</p>
+<ul>
+<li><p>In standard RNA-seq analysis of a treatment vs control experiment (e.g. cancerous vs non-cancerous, drug treated vs untreated), the goal of differential expression is to identify genes that are different in the treatment compared to control under the assumption that most gene expression is unchanged between the case and control;</p></li>
+<li><p>In GWAS analysis the goal is to identify loci or SNPs that are different in the diseased population compared the the healthy/control populations under the assumption that most differences are small;</p></li>
+<li><p>In outlier identification the goal is to identify measurements that are signficantly different from the large majority of the rest of the population.</p></li>
+</ul>
+<p>A fundamental assumptions of the two groups is that there are two groups in the set of measurements that follow different distribution and that one group makes up a large majority of the whole set. To concretely define the two groups model we follow <a href="https://pdfs.semanticscholar.org/93dd/1ad905da7b09568aaf7d04c3d325772d42fc.pdf">Efron, 2005</a>. Suppose that we have <span class="math inline">\(N\)</span> measurements with <span class="math inline">\(N\)</span> hypotheses <span class="math inline">\(H_{1}, \ldots, H_{N}\)</span>. In Efron’s case the measurements were 1-dimensional but we won’t restrict ourselves to this. Denote the measurements <span class="math inline">\(\boldsymbol{x}_{1}, \ldots, \boldsymbol{x}_{N}\)</span>. The assumption that there are two groups of measurements corresponds to assuming that the distribution of the measurements is a mixture distribution, e.g. <span class="math inline">\(\boldsymbol{x}_{i} \sim (1 - p) f_{0}( \boldsymbol{x}) + p f_{1}(\boldsymbol{x})\)</span> for some small but non-zero <span class="math inline">\(p\)</span> and <span class="math inline">\(f_{1}\)</span> sufficiently different from <span class="math inline">\(f_{0}\)</span>. <span class="math inline">\(p\)</span> is the probability that a randomly chosen hypothesis is not null.</p>
+<p>For a given measurement <span class="math inline">\(\boldsymbol{x}\)</span> we define the local fdr as the posterior probability that the corresponding hypothesis is null as <span class="math display">\[
+\text{fdr}(\boldsymbol{x}) = \Pr(\text{ hypothesis } i \text{ is null } | \boldsymbol{x}) = \frac{(1 - p) f_{0}(\boldsymbol{x})}{(1 - p) f_{0}(\boldsymbol{x}) + p f_{1}(\boldsymbol{x})}.
+\]</span> In the 1-dimensional case we usually make the assumption that the interesting cases are large positive measurements, and then we can define the global FDR of measurement <span class="math inline">\(x\)</span> as the tail area (see equation 2.7 in <a href="https://pdfs.semanticscholar.org/93dd/1ad905da7b09568aaf7d04c3d325772d42fc.pdf">Efron, 2005</a>) <span class="math display">\[
+\text{FDR}(x) = \Pr (\text{ hypothesis } i \text{ is null } | X \leq x) = \frac{ (1 - p) \int_{z \leq x} f_{0} (z) dz}{(1 - p) \int_{z \leq x} f_{0} (z) dz + p \int_{z \leq x} f_{1} (z) dz}.
+\]</span></p>
+<p>In the multidimensional case what would we consider more extreme than a measurement <span class="math inline">\(\boldsymbol{x}\)</span>? Well naturally we would take measurements that are less null, i.e. measurements with a smaller local false discovery rate.<br />
+<span class="math display">\[
+\text{FDR}(\boldsymbol{x}) = \frac{ (1 - p) \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{0} (\boldsymbol{z}) d \boldsymbol{z}}{(1 - p) \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{0} (\boldsymbol{z}) d \boldsymbol{z} + p \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{1} (\boldsymbol{z}) d \boldsymbol{z}}.
+\]</span></p>
 
 
 
