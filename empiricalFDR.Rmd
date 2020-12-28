@@ -1,48 +1,72 @@
 ---
 title: "Empirical estimation of FDR"
 author: "Timothy Daley"
-date: "7/11/2020"
-output: html_document
+date: "12/27/2020"
+output:
+  html_document:
+    fig_height: 7
+    fig_width: 7
+    toc: yes
+    code_folding: hide
+    toc_float: yes
 ---
 
-An idea I put into package CRISPhieRmix ([R package](https://github.com/timydaley/CRISPhieRmix), [paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1538-6)) is a way to estimate global false discovery rates (FDRs) from local fdrs. The FDR of an observation $x$ is fraction of false discoveries if we set our threshold to $x$.   Assuming we are looking for extremely large outliers, this is $\Pr(\text{null} | X \geq x)$.  The local false discovery rate, on the other hand, is the probability that observation $x$ is null, or in other words $\Pr(\text{null} | x)$.  
+# A brief introduction to the theory of local and global False Discovery Rates
 
-The idea for empirical estimation came from an anology from Efron, which I believe was in his book [Large-Scale Inference](https://statweb.stanford.edu/~ckirby/brad/LSI/monograph_CUP.pdf), the local false discovery rate is akin to the pdf and the global FDR is akin the cdf.  We can see this from the (rather loose) definitions given above.  Indeed, formally the global false discovery rates can be defined as the integral over the tail area of the local false discovery rates, as well as the intuition that the overall FDR must be equal to the average of the individual FDRs.  
+## Introduction
 
-For empirical estimation of the FDR, we just take the average of all local fdr's lower than the one under consideration to be the estimate of the global FDR.  In fact, this is an unbiased estimate of the marginal false discovery rate, defined formally in the one dimensional case (which helps us to give intuition as
-$$
-\text{mFDR}(x) = \frac{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x \cap g \text{ is null}) \big)}{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x) \big)}.
-$$
-A more formal definition  (see [Storey 2010](http://genomine.org/papers/Storey_FDR_2010.pdf)) is
-$$
-\text{mFDR} = \frac{\mathrm{E} (\text{true discoveries found})}{\mathrm{E}(\text{total \# discoveries})},
-$$
-with the convention that when no discoveries are found the mFDR is 0 (e.g. $\frac{0}{0} = 0$).
+A more detailed explanation is given in a my previous post [Background of two groups model
+](https://timydaley.github.io/twoGroupsBackground.html).
 
-We can in fact prove that the empirical estimator is a moment based estimator for mFDR. Let $\text{fdr}(x_{g})$ denote the local fdr of observation $g$ (which in my case was genes, hence the notation) 
+An idea I put into package CRISPhieRmix ([R package](https://github.com/timydaley/CRISPhieRmix), [paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1538-6)) is a way to estimate global false discovery rates (FDRs) from local fdrs when it is too difficult to directly compute the global FDR.
+
+The global FDR is the expected fraction of false discoveries among the ones that we call significant.  The way we usually think about this is that we're gonna compute some one dimensional statistic (e.g. $p$-value or $z$-value) for tests/categories/hypotheses $i = 1, \ldots, n$, we're gonna set a threshold $p^{*}$ (or $z^{*}$ if we look in terms of a $z$-value), then we're gonna call as significant those with $p_{i} < p^{*}$ (or $| z_{i} | > z^{*}$).  Then the expected fraction of false discoveries among the set that we called significant is the global FDR, or 
+$$
+\mathrm{E} \left( \sum_{i = 1}^{n} 1 \left( \text{test } i \text{ is null}  \cap p_{i} < p^{*} \right) / \sum_{i=1}^{n} 1 \left(p_{i} < p^{*} \right) \right).
+$$
+Note that there is some difficulty in defining the FDR when no tests are called significant.  To get around this difficulty we can define marginal FDR (mFDR) as the ratio of the expected number of nulls called significant divided by the expected number of tests called significant, with the understanding that $0/0 = 0$ (see [Storey, 2010](http://theta.edu.pl/wp-content/uploads/2012/10/Storey_FDR_2010.pdf)).  I.e.
+$$
+\text{mFDR} = \frac{\mathrm{E} \big( \sum_{i = 1}^{n} 1 \left( \text{test } i \text{ is null}  \cap p_{i} < p^{*} \right) \big)}{\mathrm{E} \big( \sum_{i = 1}^{n} 1(p_{i} < p^{*}) \big)}.
+$$
+
+ 
+
+Similarly, the local fdr (following [Efron's notation](https://pdfs.semanticscholar.org/93dd/1ad905da7b09568aaf7d04c3d325772d42fc.pdf) of keeping the local fdr in lower case) is the expected probability that an individual test is false.  So for example, for test $i$ we get $p$-value $p_{i}$ then the local fdr is 
+$$
+\Pr(\text{test } i \text{ is null} | p_{i}).
+$$
+
+
+## Empirical estimation of the global FDR
+
+The idea for empirical estimation came from an anology from [Efron, 2005](https://pdfs.semanticscholar.org/93dd/1ad905da7b09568aaf7d04c3d325772d42fc.pdf), the local false discovery rate is akin to the pdf and the global FDR is akin the cdf.  We can see this from the (rather loose) definitions given above.  Indeed, formally the global false discovery rates can be defined as the integral over the tail area of the local false discovery rates, as well as the intuition that the overall (global) FDR at a given threshold must be equal to the average of the individual local FDRs that are called significant at the threshold.  
+
+This intuition leads directly to the an easy way to estimate the global FDRs when we have the local fdrs, we just take the average of all local fdr's lower than the one under consideration to be the estimate of the global FDR.  In fact, this is an unbiased estimate of the marginal false discovery rate.
+
+
+
+We'll show this in the 1-dimensional case. For a measurement $x$, we assume that the measurements follow a mixture distribution with $x \sim f = (1- p) f_{0} + p f_{1}$.  $p$ is the probability that a randomly selected test will be non-null, $f_{0}$ is the distribution of null cases, and $f_{1}$ is the distribution of non-null cases. 
 $$
 \begin{aligned}
-\text{mFDR}(x) &\approx \frac{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x \cap g \text{ is null}) \big)}{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x) \big)} 
+\text{mFDR}(x) &\approx \frac{\mathrm{E} \big( \sum_{i = 1}^{n} 1(x_{i} \geq x \cap \text{ test } i \text{ is null}) \big)}{\mathrm{E} \big( \sum_{i = 1}^{n} 1(x_{i} \geq x) \big)} 
 \notag \\
-&= \frac{\int_{|y| \geq x} (1 - p) f_{0} (y) dy }{\int_{|y| > x} f(y) dy}
+&= \frac{\int_{|z| \geq x} (1 - p) f_{0} (z) dz }{\int_{|z| > x} f(z) dz}
 \notag \\
-&= \frac{\int_{|y| \geq x} \frac{(1 - p) f_{0} (y)}{f(y)} f(y) dy}{\int_{|y| \geq x} f(y) dy} .
+&= \frac{\int_{|z| \geq x} \frac{(1 - p) f_{0} (z)}{f(z)} f(z) dz}{\int_{|z| \geq x} f(z) dz} .
 \notag \\
-& = \frac{\mathrm{E} \big(\text{fdr}(y) \cdot 1(|y| \geq x) \big)}{\mathrm{E} \big( 1(|y| \geq x) \big)}
+& = \frac{\mathrm{E} \big(\text{fdr}(z) \cdot 1(|z| \geq x) \big)}{\mathrm{E} \big( 1(|z| \geq x) \big)}
 \notag \\
-&\approx \frac{\frac{1}{G} \sum_{g} \text{fdr}(x_{g}) 1 (\text{fdr}(x_{g}) \leq \text{fdr}(x))}{\frac{1}{G} \sum_{g} 1 (\text{fdr}(x_{g}) \leq \text{fdr}(x))} 
+&\approx \frac{\frac{1}{N} \sum_{i = 1}^{n} \text{fdr}(x_{i}) 1 (\text{fdr}(x_{i}) \leq \text{fdr}(x))}{\frac{1}{N} \sum_{i = 1}^{n} 1 (\text{fdr}(x_{i}) \leq \text{fdr}(x))}. 
 \notag \\
 &
-\notag \\
-&= \overline{\text{fdr}(x_{g}) 1(\text{fdr}(x_{g}) \leq \text{fdr}(x))}.
 \notag
 \end{aligned}
 $$
 
+
 The advantage for this method is that in some cases the local FDR is easy to compute but the global FDR is difficult.  Such I case I encountered in my hierarchical mixture modeling of pooled CRISPR screens.  Computing the global FDRs here involves integration over the level sets of a mixture model, which can be difficult.  Below is an example of the level sets for when we have 2 guides (measurements) per gene, more guides makes it even more complicated. 
 ![levelSets2D.png]
 
-How well does this do?  Let's do some simulations.
 
 # Simulations
 
@@ -57,10 +81,10 @@ We'll compare two cases, fitting the mixture model and computing the local FDR a
 ```{r}
 set.seed(12345)
 mu0 = 0
-mu1 = 2
+mu1 = 3
 sigma0 = 1
 sigma1 = 1
-p = 0.9
+p = 0.95
 N = 10000
 labels = rbinom(N, prob = 1 - p, 1)
 mu_vec = sapply(labels, function(i) if(i == 1) mu1 else mu0)
@@ -69,12 +93,16 @@ sigma_vec = sapply(labels, function(i) if(i == 1) sigma1 else sigma0)
 stopifnot(sum(mu_vec != 0)/length(mu_vec) == sum(labels)/length(labels))
 x = rnorm(N, mean = mu_vec, sd = sigma_vec)
 ```
-```{r}
+```{r message=F}
 mixfit = mixtools::normalmixEM2comp(x, lambda = c(0.5, 0.5), 
                                     mu = c(0, 1), sigsqrd = c(1, 1))
-mixfit$lambda
-mixfit$mu
-mixfit$sigma
+print("fitted proportions: ")
+print(mixfit$lambda)
+print("fitted means: ")
+print(mixfit$mu)
+print("fitted sd's: ")
+print(mixfit$sigma)
+
 # taken from https://tinyheero.github.io/2015/10/13/mixture-model.html
 plot_mix_comps <- function(x, mu, sigma, lam) {
   lam * dnorm(x, mu, sigma)
@@ -96,11 +124,11 @@ ggplot(data.frame(x = x) ) +
 
 The local FDR here is easy to compute, 
 $$
-\Pr(g \text{ is null} | x_{g}) = \frac{p f_{1} (x_{g} | \mu_{1}, \sigma_{1})}{(1 - p) f_{0}(x_{g} | \mu_{0}, \sigma_{0}) + p f_{1} (x_{g} | \mu_{1}, \sigma_{1})}.
+\Pr(i \text{ is null} | x_{i}) = \frac{p f_{1} (x_{i} | \mu_{1}, \sigma_{1})}{(1 - p) f_{0}(x_{i} | \mu_{0}, \sigma_{0}) + p f_{1} (x_{i} | \mu_{1}, \sigma_{1})}.
 $$
 Similarly the global mFDR is equal to 
 $$
-mFDR(g) = \frac{\int_{x \geq x_{g}} p f_{1} (x | \mu_{1}, \sigma_{1}) dx}{\int_{x \geq x_{g}} (1 - p) f_{0}(x | \mu_{0}, \sigma_{0}) + p f_{1} (x | \mu_{1}, \sigma_{1}) dx}.
+mFDR(i) = \frac{\int_{x \geq x_{i}} p f_{1} (x | \mu_{1}, \sigma_{1}) dx}{\int_{x \geq x_{i}} (1 - p) f_{0}(x | \mu_{0}, \sigma_{0}) + p f_{1} (x | \mu_{1}, \sigma_{1}) dx}.
 $$
 Of course, the global FDR (not marginal) has the integral outside the fraction above, but the above equation is much easier to compute because the integrals can be calculated from the cdf of the normal distribution.  
 
@@ -149,7 +177,6 @@ compare_fdr <- function(x, p, mu, sigma, labels){
 }
 
 normal_2_group_fdr_comparison = compare_fdr(x, mixfit$lambda, mixfit$mu, mixfit$sigma, labels)
-head(normal_2_group_fdr_comparison)
 ```
 
 ```{r}
@@ -161,9 +188,13 @@ df = data.frame(estimated_fdr = c(normal_2_group_fdr_comparison$loc_mFDR,
 ggplot(df, aes(y = true_fdr, x = estimated_fdr, col = method)) + geom_line() + scale_colour_brewer(palette = "Set1") + theme_bw() + geom_abline(intercept = 0, slope = 1)
 ```
 
-The empirical method is on-par with exact method, though the Benjamini-Hochberg FDRs show better calibration with the true FDR.  Let's now take a look at the hierarchical model.  
+The empirical method is on-par with exact method, though the Benjamini-Hochberg FDRs show slightly better calibration with the true FDR.  
 
-```{r}
+## Multi-dimensional case
+
+Let's now take a look at the hierarchical model.  We'll assume that each test/gene have 5 measurements, and the measurements for the non-null genes also follow a mixture distribution, e.g. $f_{1} = (1 - q) f_{0} + q f_{2}$.  This creates more uncertainty about the true positives.  
+
+```{r message=F}
 set.seed(12345)
 n_genes = 10000
 n_guides_per_gene = 5
@@ -189,12 +220,15 @@ for(i in 1:n_genes){
   }
 }
 ```
-```{r}
+```{r message=F}
 mixfit = mixtools::normalmixEM2comp(x, lambda = c(0.5, 0.5), 
                                     mu = c(0, 1), sigsqrd = c(1, 1))
-mixfit$lambda
-mixfit$mu
-mixfit$sigma
+print("fitted proportions: ")
+print(mixfit$lambda)
+print("fitted means: ")
+print(mixfit$mu)
+print("fitted sd's: ")
+print(mixfit$sigma)
 ```
 ```{r}
 # taken from https://tinyheero.github.io/2015/10/13/mixture-model.html

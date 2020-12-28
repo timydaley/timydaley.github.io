@@ -6,6 +6,8 @@ navbar:
       href: FisherVsStouffer.html
     - text: "2 groups"
       href: twoGroupsBackground.html
+    - text: "empirical estimation of FDRs"
+      href: empiricalFDR.html
 output_dir: "."
 output:
   html_document:

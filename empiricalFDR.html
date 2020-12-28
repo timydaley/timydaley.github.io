@@ -11,6 +11,7 @@
 
 <meta name="author" content="Timothy Daley" />
 
+<meta name="date" content="2020-12-27" />
 
 <title>Empirical estimation of FDR</title>
 
@@ -20,7 +21,11 @@
 <script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
 <script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
 <script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
 <script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
 <link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
 <script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
 <link href="site_libs/anchor-sections-1.0/anchor-sections.css" rel="stylesheet" />
@@ -257,7 +262,73 @@ $(document).ready(function () {
 </style>
 
 <!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
 
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
 
 
 
@@ -267,6 +338,16 @@ $(document).ready(function () {
 
 
 <div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
 
 
 
@@ -287,7 +368,7 @@ $(document).ready(function () {
   <a href="FisherVsStouffer.html">Fisher vs Stouffer</a>
 </li>
 <li>
-  <a href="empiricalFDR.html">emprical estimation of the global FDR</a>
+  <a href="twoGroupsBackground.html">2 groups</a>
 </li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
@@ -299,42 +380,61 @@ $(document).ready(function () {
 
 <div class="fluid-row" id="header">
 
+<div class="btn-group pull-right">
+<button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
 
 
 <h1 class="title toc-ignore">Empirical estimation of FDR</h1>
 <h4 class="author">Timothy Daley</h4>
-<h4 class="date">7/11/2020</h4>
+<h4 class="date">12/27/2020</h4>
 
 </div>
 
 
-<p>An idea I put into package CRISPhieRmix (<a href="https://github.com/timydaley/CRISPhieRmix">R package</a>, <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1538-6">paper</a>) is a way to estimate global false discovery rates (FDRs) from local fdrs. The FDR of an observation <span class="math inline">\(x\)</span> is fraction of false discoveries if we set our threshold to <span class="math inline">\(x\)</span>. Assuming we are looking for extremely large outliers, this is <span class="math inline">\(\Pr(\text{null} | X \geq x)\)</span>. The local false discovery rate, on the other hand, is the probability that observation <span class="math inline">\(x\)</span> is null, or in other words <span class="math inline">\(\Pr(\text{null} | x)\)</span>.</p>
-<p>The idea for empirical estimation came from an anology from Efron, which I believe was in his book <a href="https://statweb.stanford.edu/~ckirby/brad/LSI/monograph_CUP.pdf">Large-Scale Inference</a>, the local false discovery rate is akin to the pdf and the global FDR is akin the cdf. We can see this from the (rather loose) definitions given above. Indeed, formally the global false discovery rates can be defined as the integral over the tail area of the local false discovery rates, as well as the intuition that the overall FDR must be equal to the average of the individual FDRs.</p>
-<p>For empirical estimation of the FDR, we just take the average of all local fdr’s lower than the one under consideration to be the estimate of the global FDR. In fact, this is an unbiased estimate of the marginal false discovery rate, defined formally in the one dimensional case (which helps us to give intuition as <span class="math display">\[
-\text{mFDR}(x) = \frac{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x \cap g \text{ is null}) \big)}{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x) \big)}.
-\]</span> A more formal definition (see <a href="http://genomine.org/papers/Storey_FDR_2010.pdf">Storey 2010</a>) is <span class="math display">\[
-\text{mFDR} = \frac{\mathrm{E} (\text{true discoveries found})}{\mathrm{E}(\text{total \# discoveries})},
-\]</span> with the convention that when no discoveries are found the mFDR is 0 (e.g. <span class="math inline">\(\frac{0}{0} = 0\)</span>).</p>
-<p>We can in fact prove that the empirical estimator is a moment based estimator for mFDR. Let <span class="math inline">\(\text{fdr}(x_{g})\)</span> denote the local fdr of observation <span class="math inline">\(g\)</span> (which in my case was genes, hence the notation) <span class="math display">\[
+<div id="a-brief-introduction-to-the-theory-of-local-and-global-false-discovery-rates" class="section level1">
+<h1>A brief introduction to the theory of local and global False Discovery Rates</h1>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>A more detailed explanation is given in a my previous post <a href="https://timydaley.github.io/twoGroupsBackground.html">Background of two groups model</a>.</p>
+<p>An idea I put into package CRISPhieRmix (<a href="https://github.com/timydaley/CRISPhieRmix">R package</a>, <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1538-6">paper</a>) is a way to estimate global false discovery rates (FDRs) from local fdrs when it is too difficult to directly compute the global FDR.</p>
+<p>The global FDR is the expected fraction of false discoveries among the ones that we call significant. The way we usually think about this is that we’re gonna compute some one dimensional statistic (e.g. <span class="math inline">\(p\)</span>-value or <span class="math inline">\(z\)</span>-value) for tests/categories/hypotheses <span class="math inline">\(i = 1, \ldots, n\)</span>, we’re gonna set a threshold <span class="math inline">\(p^{*}\)</span> (or <span class="math inline">\(z^{*}\)</span> if we look in terms of a <span class="math inline">\(z\)</span>-value), then we’re gonna call as significant those with <span class="math inline">\(p_{i} &lt; p^{*}\)</span> (or <span class="math inline">\(| z_{i} | &gt; z^{*}\)</span>). Then the expected fraction of false discoveries among the set that we called significant is the global FDR, or <span class="math display">\[
+\mathrm{E} \left( \sum_{i = 1}^{n} 1 \left( \text{test } i \text{ is null}  \cap p_{i} &lt; p^{*} \right) / \sum_{i=1}^{n} 1 \left(p_{i} &lt; p^{*} \right) \right).
+\]</span> Note that there is some difficulty in defining the FDR when no tests are called significant. To get around this difficulty we can define marginal FDR (mFDR) as the ratio of the expected number of nulls called significant divided by the expected number of tests called significant, with the understanding that <span class="math inline">\(0/0 = 0\)</span> (see <a href="http://theta.edu.pl/wp-content/uploads/2012/10/Storey_FDR_2010.pdf">Storey, 2010</a>). I.e. <span class="math display">\[
+\text{mFDR} = \frac{\mathrm{E} \big( \sum_{i = 1}^{n} 1 \left( \text{test } i \text{ is null}  \cap p_{i} &lt; p^{*} \right) \big)}{\mathrm{E} \big( \sum_{i = 1}^{n} 1(p_{i} &lt; p^{*}) \big)}.
+\]</span></p>
+<p>Similarly, the local fdr (following <a href="https://pdfs.semanticscholar.org/93dd/1ad905da7b09568aaf7d04c3d325772d42fc.pdf">Efron’s notation</a> of keeping the local fdr in lower case) is the expected probability that an individual test is false. So for example, for test <span class="math inline">\(i\)</span> we get <span class="math inline">\(p\)</span>-value <span class="math inline">\(p_{i}\)</span> then the local fdr is <span class="math display">\[
+\Pr(\text{test } i \text{ is null} | p_{i}).
+\]</span></p>
+</div>
+<div id="empirical-estimation-of-the-global-fdr" class="section level2">
+<h2>Empirical estimation of the global FDR</h2>
+<p>The idea for empirical estimation came from an anology from <a href="https://pdfs.semanticscholar.org/93dd/1ad905da7b09568aaf7d04c3d325772d42fc.pdf">Efron, 2005</a>, the local false discovery rate is akin to the pdf and the global FDR is akin the cdf. We can see this from the (rather loose) definitions given above. Indeed, formally the global false discovery rates can be defined as the integral over the tail area of the local false discovery rates, as well as the intuition that the overall (global) FDR at a given threshold must be equal to the average of the individual local FDRs that are called significant at the threshold.</p>
+<p>This intuition leads directly to the an easy way to estimate the global FDRs when we have the local fdrs, we just take the average of all local fdr’s lower than the one under consideration to be the estimate of the global FDR. In fact, this is an unbiased estimate of the marginal false discovery rate.</p>
+<p>We’ll show this in the 1-dimensional case. For a measurement <span class="math inline">\(x\)</span>, we assume that the measurements follow a mixture distribution with <span class="math inline">\(x \sim f = (1- p) f_{0} + p f_{1}\)</span>. <span class="math inline">\(p\)</span> is the probability that a randomly selected test will be non-null, <span class="math inline">\(f_{0}\)</span> is the distribution of null cases, and <span class="math inline">\(f_{1}\)</span> is the distribution of non-null cases. <span class="math display">\[
 \begin{aligned}
-\text{mFDR}(x) &amp;\approx \frac{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x \cap g \text{ is null}) \big)}{\mathrm{E} \big( \sum_{g} 1(x_{g} \geq x) \big)} 
+\text{mFDR}(x) &amp;\approx \frac{\mathrm{E} \big( \sum_{i = 1}^{n} 1(x_{i} \geq x \cap \text{ test } i \text{ is null}) \big)}{\mathrm{E} \big( \sum_{i = 1}^{n} 1(x_{i} \geq x) \big)} 
 \notag \\
-&amp;= \frac{\int_{|y| \geq x} (1 - p) f_{0} (y) dy }{\int_{|y| &gt; x} f(y) dy}
+&amp;= \frac{\int_{|z| \geq x} (1 - p) f_{0} (z) dz }{\int_{|z| &gt; x} f(z) dz}
 \notag \\
-&amp;= \frac{\int_{|y| \geq x} \frac{(1 - p) f_{0} (y)}{f(y)} f(y) dy}{\int_{|y| \geq x} f(y) dy} .
+&amp;= \frac{\int_{|z| \geq x} \frac{(1 - p) f_{0} (z)}{f(z)} f(z) dz}{\int_{|z| \geq x} f(z) dz} .
 \notag \\
-&amp; = \frac{\mathrm{E} \big(\text{fdr}(y) \cdot 1(|y| \geq x) \big)}{\mathrm{E} \big( 1(|y| \geq x) \big)}
+&amp; = \frac{\mathrm{E} \big(\text{fdr}(z) \cdot 1(|z| \geq x) \big)}{\mathrm{E} \big( 1(|z| \geq x) \big)}
 \notag \\
-&amp;\approx \frac{\frac{1}{G} \sum_{g} \text{fdr}(x_{g}) 1 (\text{fdr}(x_{g}) \leq \text{fdr}(x))}{\frac{1}{G} \sum_{g} 1 (\text{fdr}(x_{g}) \leq \text{fdr}(x))} 
+&amp;\approx \frac{\frac{1}{N} \sum_{i = 1}^{n} \text{fdr}(x_{i}) 1 (\text{fdr}(x_{i}) \leq \text{fdr}(x))}{\frac{1}{N} \sum_{i = 1}^{n} 1 (\text{fdr}(x_{i}) \leq \text{fdr}(x))}. 
 \notag \\
 &amp;
-\notag \\
-&amp;= \overline{\text{fdr}(x_{g}) 1(\text{fdr}(x_{g}) \leq \text{fdr}(x))}.
 \notag
 \end{aligned}
 \]</span></p>
 <p>The advantage for this method is that in some cases the local FDR is easy to compute but the global FDR is difficult. Such I case I encountered in my hierarchical mixture modeling of pooled CRISPR screens. Computing the global FDRs here involves integration over the level sets of a mixture model, which can be difficult. Below is an example of the level sets for when we have 2 guides (measurements) per gene, more guides makes it even more complicated. [levelSets2D.png]</p>
-<p>How well does this do? Let’s do some simulations.</p>
+</div>
+</div>
 <div id="simulations" class="section level1">
 <h1>Simulations</h1>
 <div id="d-case" class="section level2">
@@ -344,10 +444,10 @@ f(x) \sim (1 - p) \mathcal{N}(0, \sigma_{0}^2) + p \mathcal{N}(\mu, \sigma_{1}^{
 \]</span> We’ll compare two cases, fitting the mixture model and computing the local FDR and global FDR from the empirical method, and the exact method (because it’s easy to compute in this case).</p>
 <pre class="r"><code>set.seed(12345)
 mu0 = 0
-mu1 = 2
+mu1 = 3
 sigma0 = 1
 sigma1 = 1
-p = 0.9
+p = 0.95
 N = 10000
 labels = rbinom(N, prob = 1 - p, 1)
 mu_vec = sapply(labels, function(i) if(i == 1) mu1 else mu0)
@@ -358,12 +458,18 @@ x = rnorm(N, mean = mu_vec, sd = sigma_vec)</code></pre>
 <pre class="r"><code>mixfit = mixtools::normalmixEM2comp(x, lambda = c(0.5, 0.5), 
                                     mu = c(0, 1), sigsqrd = c(1, 1))</code></pre>
 <pre><code>## number of iterations= 1000</code></pre>
-<pre class="r"><code>mixfit$lambda</code></pre>
-<pre><code>## [1] 0.6263988 0.3736012</code></pre>
-<pre class="r"><code>mixfit$mu</code></pre>
-<pre><code>## [1] -0.1211857  0.7166598</code></pre>
-<pre class="r"><code>mixfit$sigma</code></pre>
-<pre><code>## [1] 0.9278408 1.3042685</code></pre>
+<pre class="r"><code>print(&quot;fitted proportions: &quot;)</code></pre>
+<pre><code>## [1] &quot;fitted proportions: &quot;</code></pre>
+<pre class="r"><code>print(mixfit$lambda)</code></pre>
+<pre><code>## [1] 0.94405034 0.05594966</code></pre>
+<pre class="r"><code>print(&quot;fitted means: &quot;)</code></pre>
+<pre><code>## [1] &quot;fitted means: &quot;</code></pre>
+<pre class="r"><code>print(mixfit$mu)</code></pre>
+<pre><code>## [1] -0.008031135  2.656248538</code></pre>
+<pre class="r"><code>print(&quot;fitted sd&#39;s: &quot;)</code></pre>
+<pre><code>## [1] &quot;fitted sd&#39;s: &quot;</code></pre>
+<pre class="r"><code>print(mixfit$sigma)</code></pre>
+<pre><code>## [1] 0.9948498 1.1280971</code></pre>
 <pre class="r"><code># taken from https://tinyheero.github.io/2015/10/13/mixture-model.html
 plot_mix_comps &lt;- function(x, mu, sigma, lam) {
   lam * dnorm(x, mu, sigma)
@@ -381,9 +487,9 @@ ggplot(data.frame(x = x) ) +
   ylab(&quot;Density&quot;) + theme_bw()</code></pre>
 <p><img src="empiricalFDR_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
 <p>The local FDR here is easy to compute, <span class="math display">\[
-\Pr(g \text{ is null} | x_{g}) = \frac{p f_{1} (x_{g} | \mu_{1}, \sigma_{1})}{(1 - p) f_{0}(x_{g} | \mu_{0}, \sigma_{0}) + p f_{1} (x_{g} | \mu_{1}, \sigma_{1})}.
+\Pr(i \text{ is null} | x_{i}) = \frac{p f_{1} (x_{i} | \mu_{1}, \sigma_{1})}{(1 - p) f_{0}(x_{i} | \mu_{0}, \sigma_{0}) + p f_{1} (x_{i} | \mu_{1}, \sigma_{1})}.
 \]</span> Similarly the global mFDR is equal to <span class="math display">\[
-mFDR(g) = \frac{\int_{x \geq x_{g}} p f_{1} (x | \mu_{1}, \sigma_{1}) dx}{\int_{x \geq x_{g}} (1 - p) f_{0}(x | \mu_{0}, \sigma_{0}) + p f_{1} (x | \mu_{1}, \sigma_{1}) dx}.
+mFDR(i) = \frac{\int_{x \geq x_{i}} p f_{1} (x | \mu_{1}, \sigma_{1}) dx}{\int_{x \geq x_{i}} (1 - p) f_{0}(x | \mu_{0}, \sigma_{0}) + p f_{1} (x | \mu_{1}, \sigma_{1}) dx}.
 \]</span> Of course, the global FDR (not marginal) has the integral outside the fraction above, but the above equation is much easier to compute because the integrals can be calculated from the cdf of the normal distribution.</p>
 <pre class="r"><code>normal_2group_loc_fdr &lt;- function(x, p, mu, sigma){
   # the assumption here is that the null group is the second group
@@ -424,15 +530,7 @@ compare_fdr &lt;- function(x, p, mu, sigma, labels){
                     true_FDR = true_fdr))
 }
 
-normal_2_group_fdr_comparison = compare_fdr(x, mixfit$lambda, mixfit$mu, mixfit$sigma, labels)
-head(normal_2_group_fdr_comparison)</code></pre>
-<pre><code>##            x   loc_fdr  loc_mFDR      mFDR    BH_FDR  true_FDR
-## 1 -0.6924722 0.2224553 0.5882735 0.5876363 0.9353283 0.8777991
-## 2  1.1246956 0.4988124 0.2844968 0.2849966 0.4535784 0.6054628
-## 3  0.1745351 0.2905057 0.4877070 0.4874114 0.7779131 0.8078440
-## 4 -1.9678067 0.2699363 0.6254487 0.6255618 0.9989467 0.9018524
-## 5 -1.6442717 0.2407911 0.6227566 0.6226736 0.9935730 0.8996652
-## 6 -0.1097847 0.2576892 0.5309278 0.5297593 0.8418791 0.8397959</code></pre>
+normal_2_group_fdr_comparison = compare_fdr(x, mixfit$lambda, mixfit$mu, mixfit$sigma, labels)</code></pre>
 <pre class="r"><code>df = data.frame(estimated_fdr = c(normal_2_group_fdr_comparison$loc_mFDR, 
                                   normal_2_group_fdr_comparison$mFDR, 
                                   normal_2_group_fdr_comparison$BH_FDR), 
@@ -440,7 +538,11 @@ head(normal_2_group_fdr_comparison)</code></pre>
                 true_fdr = rep(normal_2_group_fdr_comparison$true_FDR, times = 3))
 ggplot(df, aes(y = true_fdr, x = estimated_fdr, col = method)) + geom_line() + scale_colour_brewer(palette = &quot;Set1&quot;) + theme_bw() + geom_abline(intercept = 0, slope = 1)</code></pre>
 <p><img src="empiricalFDR_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
-<p>The empirical method is on-par with exact method, though the Benjamini-Hochberg FDRs show better calibration with the true FDR. Let’s now take a look at the hierarchical model.</p>
+<p>The empirical method is on-par with exact method, though the Benjamini-Hochberg FDRs show slightly better calibration with the true FDR.</p>
+</div>
+<div id="multi-dimensional-case" class="section level2">
+<h2>Multi-dimensional case</h2>
+<p>Let’s now take a look at the hierarchical model. We’ll assume that each test/gene have 5 measurements, and the measurements for the non-null genes also follow a mixture distribution, e.g. <span class="math inline">\(f_{1} = (1 - q) f_{0} + q f_{2}\)</span>. This creates more uncertainty about the true positives.</p>
 <pre class="r"><code>set.seed(12345)
 n_genes = 10000
 n_guides_per_gene = 5
@@ -468,11 +570,17 @@ for(i in 1:n_genes){
 <pre class="r"><code>mixfit = mixtools::normalmixEM2comp(x, lambda = c(0.5, 0.5), 
                                     mu = c(0, 1), sigsqrd = c(1, 1))</code></pre>
 <pre><code>## number of iterations= 1000</code></pre>
-<pre class="r"><code>mixfit$lambda</code></pre>
+<pre class="r"><code>print(&quot;fitted proportions: &quot;)</code></pre>
+<pre><code>## [1] &quot;fitted proportions: &quot;</code></pre>
+<pre class="r"><code>print(mixfit$lambda)</code></pre>
 <pre><code>## [1] 0.8075129 0.1924871</code></pre>
-<pre class="r"><code>mixfit$mu</code></pre>
+<pre class="r"><code>print(&quot;fitted means: &quot;)</code></pre>
+<pre><code>## [1] &quot;fitted means: &quot;</code></pre>
+<pre class="r"><code>print(mixfit$mu)</code></pre>
 <pre><code>## [1] -0.05286371  0.72474277</code></pre>
-<pre class="r"><code>mixfit$sigma</code></pre>
+<pre class="r"><code>print(&quot;fitted sd&#39;s: &quot;)</code></pre>
+<pre><code>## [1] &quot;fitted sd&#39;s: &quot;</code></pre>
+<pre class="r"><code>print(mixfit$sigma)</code></pre>
 <pre><code>## [1] 0.9720461 1.3047024</code></pre>
 <pre class="r"><code># taken from https://tinyheero.github.io/2015/10/13/mixture-model.html
 plot_mix_comps &lt;- function(x, mu, sigma, lam) {
@@ -556,6 +664,8 @@ ggplot(df, aes(y = true_FDR, x = estimated_FDR, col = method)) + geom_line() + t
 
 
 
+</div>
+</div>
 
 </div>
 
@@ -587,7 +697,38 @@ $(document).ready(function () {
 </script>
 
 <!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
 
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
 
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>
