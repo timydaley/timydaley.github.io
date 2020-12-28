@@ -29,3 +29,19 @@ $$
 \text{FDR}(\boldsymbol{x}) = \frac{ (1 - p) \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{0} (\boldsymbol{z}) d \boldsymbol{z}}{(1 - p) \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{0} (\boldsymbol{z}) d \boldsymbol{z} + p \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{1} (\boldsymbol{z}) d \boldsymbol{z}}.
 $$
 
+# Examples
+
+## $p$-values
+
+A pretty clear example is in $p$-values, a common summary statistic of a hypothesis.  A difference here is that there is a strong theoretical null distribution if the null hyotheseses are all correctly specified, namely a $\text{Uniform}(0, 1)$.  This leads to something like the figure below taken from Figure 1 of [Storey and Tibshirani, 2003](https://www.pnas.org/content/100/16/9440.full?__hstc=31177824.2a1e835c34ab7bf88e972fdd7a7debc8.1442188800044.1442188800045.1442188800046.1&__hssc=31177824.1.1442188800047&__hsfp=1314462730).  
+
+<img src="F1.large.jpg" alt="A mixture of null and non-null p-values" width="400"/>
+
+The non-null group can be seen as those in excess of expected under the null in the left hand tail of the distribution.  The known null allows for easy estimation of $p$ and $f_{1}$.  
+
+## Differential expression
+
+In differential expression analysis we assume that after normalization most gene effects are zero, then we look for log fold changes that are significantly different from 0.  This is shown below, taken from Figure 4 in [Ritchie et al, 2015](https://academic.oup.com/nar/article/43/7/e47/2414268).  The red points are the genes that were identified as significantly different from zero.
+
+<img src="differentialExpressionLogFoldChangeA.png" alt="Differential expression with log fold change" width="400"/>
+

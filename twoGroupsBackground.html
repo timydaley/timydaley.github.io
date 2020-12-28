@@ -287,6 +287,9 @@ $(document).ready(function () {
         <li>
   <a href="FisherVsStouffer.html">Fisher vs Stouffer</a>
 </li>
+<li>
+  <a href="twoGroupsBackground.html">2 groups</a>
+</li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
         
@@ -322,6 +325,20 @@ $(document).ready(function () {
 <span class="math display">\[
 \text{FDR}(\boldsymbol{x}) = \frac{ (1 - p) \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{0} (\boldsymbol{z}) d \boldsymbol{z}}{(1 - p) \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{0} (\boldsymbol{z}) d \boldsymbol{z} + p \int_{\boldsymbol{z}: \text{fdr}(\boldsymbol{z}) \leq \text{fdr}(\boldsymbol{x})} f_{1} (\boldsymbol{z}) d \boldsymbol{z}}.
 \]</span></p>
+<div id="examples" class="section level1">
+<h1>Examples</h1>
+<div id="p-values" class="section level2">
+<h2><span class="math inline">\(p\)</span>-values</h2>
+<p>A pretty clear example is in <span class="math inline">\(p\)</span>-values, a common summary statistic of a hypothesis. A difference here is that there is a strong theoretical null distribution if the null hyotheseses are all correctly specified, namely a <span class="math inline">\(\text{Uniform}(0, 1)\)</span>. This leads to something like the figure below taken from Figure 1 of <a href="https://www.pnas.org/content/100/16/9440.full?__hstc=31177824.2a1e835c34ab7bf88e972fdd7a7debc8.1442188800044.1442188800045.1442188800046.1&amp;__hssc=31177824.1.1442188800047&amp;__hsfp=1314462730">Storey and Tibshirani, 2003</a>.</p>
+<p><img src="F1.large.jpg" alt="A mixture of null and non-null p-values" width="400"/></p>
+<p>The non-null group can be seen as those in excess of expected under the null in the left hand tail of the distribution. The known null allows for easy estimation of <span class="math inline">\(p\)</span> and <span class="math inline">\(f_{1}\)</span>.</p>
+</div>
+<div id="differential-expression" class="section level2">
+<h2>Differential expression</h2>
+<p>In differential expression analysis we assume that after normalization most gene effects are zero, then we look for log fold changes that are significantly different from 0. This is shown below, taken from Figure 4 in <a href="https://academic.oup.com/nar/article/43/7/e47/2414268">Ritchie et al, 2015</a>. The red points are the genes that were identified as significantly different from zero.</p>
+<p><img src="differentialExpressionLogFoldChangeA.png" alt="Differential expression with log fold change" width="400"/></p>
+</div>
+</div>
 
 
 
