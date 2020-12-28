@@ -367,6 +367,12 @@ div.tocify {
         <li>
   <a href="FisherVsStouffer.html">Fisher vs Stouffer</a>
 </li>
+<li>
+  <a href="twoGroupsBackground.html">2 groups</a>
+</li>
+<li>
+  <a href="empiricalFDR.html">empirical estimation of FDRs</a>
+</li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
         
@@ -527,7 +533,7 @@ empirical_fdr.head()</code></pre>
                    &#39;condition&#39;: [&#39;fisher&#39;]*empirical_fdr.shape[0] + [&#39;stouffer&#39;]*empirical_fdr.shape[0]})
 
 plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fbdb8ee7970&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7ffd20a440d0&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
@@ -565,7 +571,7 @@ df = pd.DataFrame({&#39;estimated_fdr&#39;: long_tailed_empirical_fdr[&#39;fdr_t
                    &#39;empirical_fdr&#39;: long_tailed_empirical_fdr[&#39;fisher&#39;].tolist() + long_tailed_empirical_fdr[&#39;stouffer&#39;].tolist(),
                    &#39;condition&#39;: [&#39;fisher&#39;]*long_tailed_empirical_fdr.shape[0] + [&#39;stouffer&#39;]*long_tailed_empirical_fdr.shape[0]})</code></pre>
 <pre class="python"><code>plt.plot([0, 1], [0, 1], &#39;--&#39;, color = &#39;black&#39;)</code></pre>
-<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7fbdc04e5430&gt;]</code></pre>
+<pre><code>## [&lt;matplotlib.lines.Line2D object at 0x7ffd1083e070&gt;]</code></pre>
 <pre class="python"><code>seaborn.lineplot(x = &#39;estimated_fdr&#39;, y = &#39;empirical_fdr&#39;, hue = &#39;condition&#39;, data = df)</code></pre>
 <pre><code>## &lt;AxesSubplot:xlabel=&#39;estimated_fdr&#39;, ylabel=&#39;empirical_fdr&#39;&gt;</code></pre>
 <pre class="python"><code>plt.show()</code></pre>
