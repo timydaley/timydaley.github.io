@@ -341,6 +341,15 @@ $(document).ready(function () {
 <p>In differential expression analysis we assume that after normalization most gene effects are zero, then we look for log fold changes that are significantly different from 0. This is shown below, taken from Figure 4 in <a href="https://academic.oup.com/nar/article/43/7/e47/2414268">Ritchie et al, 2015</a>. The red points are the genes that were identified as significantly different from zero.</p>
 <p><img src="differentialExpressionLogFoldChangeA.png" alt="Differential expression with log fold change" width="400"/></p>
 </div>
+<div id="high-throughput-screening-for-drug-discovery" class="section level2">
+<h2>High throughput screening for drug discovery</h2>
+<p>High throughput screening is usually the first step in identifying possible targets for druggable molecules, e.g. <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3058157/">Hughes et al, 2011</a>. A large swath of molecules are assayed and measured for particular chemical properties, such as binding to a desired molecule. Then the outliers in the desired direction are chosen as possible hits for further in depth investigation, e.g. <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4965338/">Shaby et al, 2016</a>.</p>
+</div>
+<div id="pooled-crispr-screens" class="section level2">
+<h2>Pooled CRISPR screens</h2>
+<p>The primary motivating application of the two groups model for me is pooled CRISPR screens. In such screens thousands of genes or loci are perturbed with CRISPRko (knockout), CRISPRi (inhibition), or CRISPRa (activation), and then selected for some phenotype. The genes with significant changes (positive or negative, depending on the application) from the rest are likely to be associated with the desired phenotype and are chosen for further investigation. One difference in this application is that there are several measurements per gene and these can show high variability in their effects, even for known positive hits. This lead me to suggest a hierarchical two groups model, shown below.</p>
+<p><img src="CRISPhieRmixFig1.png" alt="CRISPhieRmix model" width="400"/></p>
+</div>
 </div>
 
 

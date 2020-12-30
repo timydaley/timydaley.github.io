@@ -45,3 +45,13 @@ In differential expression analysis we assume that after normalization most gene
 
 <img src="differentialExpressionLogFoldChangeA.png" alt="Differential expression with log fold change" width="400"/>
 
+
+## High throughput screening for drug discovery
+
+High throughput screening is usually the first step in identifying possible targets for druggable molecules, e.g. [Hughes et al, 2011](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3058157/).   A large swath of molecules are assayed and measured for particular chemical properties, such as binding to a desired molecule.  Then the outliers in the desired direction are chosen as possible hits for further in depth investigation, e.g. [Shaby et al, 2016](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4965338/). 
+
+## Pooled CRISPR screens
+
+The primary motivating application of the two groups model for me is pooled CRISPR screens.  In such screens thousands of genes or loci are perturbed with CRISPRko (knockout), CRISPRi (inhibition), or CRISPRa (activation), and then selected for some phenotype.  The genes with significant changes (positive or negative, depending on the application) from the rest are likely to be associated with the desired phenotype and are chosen for further investigation.  One difference in this application is that there are several measurements per gene and these can show high variability in their effects, even for known positive hits.  This lead me to suggest a hierarchical two groups model, shown below.
+
+<img src="CRISPhieRmixFig1.png" alt="CRISPhieRmix model" width="400"/>
