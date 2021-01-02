@@ -6,7 +6,8 @@ output:
     fig_width: 1
 ---
 
-This is a collection of blogs about statistics and statistical learning, usually centered around biological applications.
+
+This is a collection of blogs about statistics and statistical learning, usually centered around biological applications.  I like writing and spreading knowledge, but I don't like the peer review process. hence the blog. 
 
 
 <sub><sup> Disclaimer: These essays represent my personal views and are not reflective of the views of my current or past employers. </sup></sub>
