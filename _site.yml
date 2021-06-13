@@ -8,6 +8,8 @@ navbar:
       href: twoGroupsBackground.html
     - text: "empirical estimation of FDRs"
       href: empiricalFDR.html
+    - text: "LNP for CRISPR QC"
+      href: CRISPR_qc/PoissonLogNormal.html 
 output_dir: "."
 output:
   html_document:

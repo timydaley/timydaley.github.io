@@ -1,0 +1,351 @@
+---
+title: "The log-Normal prior for the quality control of CRISPR screens: an alternative to adding 1"
+author: "Timothy Daley"
+date: "6/5/2021"
+output:
+  html_document:
+    fig_height: 7
+    fig_width: 7
+    toc: yes
+    code_folding: hide
+    toc_float: yes
+---
+
+The log-Normal Poisson distribution is the natural distribution to model the sequenced/observed counts of a CRISPR screening experiment. We consider that at the start every spacer/sgRNA is present once in the pool of molecules.   At each round of PCR amplification we should double the number of molecules, but PCR amplification is not 100% efficient.  So at each step with double some random number of molecules, and after $R$ rounds we get
+
+\begin{equation}
+\big(  \ldots \big( \big( 2^{\epsilon_{1} } \big)^{\epsilon_{2}} \big)^{\epsilon_{3}} \ldots \big)^{\epsilon_{R}} = 2^{\sum_{i=1}^{R} \epsilon_{i}}
+\tag{1}
+\end{equation}
+
+copies of a specific sgRNA in the pool, where $\epsilon_{i}$ are random variables with some mean < 1.  Note that they are not identically distributed because they depend on the outcomes of the previous rounds of PCR.   Taking the log of equation 1 we get that the number of molecules is proportional to the sum of random variables with the same mean.  If $R$ is large enough then we can invoke the Central Limit Theorem and get that the log of the number of molecules is approximately Normally distributed.  Since sequencing essentially samples molecules from the pool in proportion to their abundance, we get our desired Poisson log-Normal distribution for the number of sequenced molecules.
+
+# Using the Poisson log-Normal to estimate abundance
+
+For a lot of applications we are interested in estimating the abundance of each spacer  So given a sgRNA $g$ with count $x_{g}$,  we want to estimate $\mathrm{E} (\lambda_{g} | x_{g})$.  It makes sense here to pool information from the whole library to make inferences at each indivdual guide, so we can estimate the (log-Normal) parameters of the pool and then use those to estimate the posterior abundance of each spacer. 
+
+## Estimating the posterior abundance
+
+Given $\mu, \sigma$, what's the posterior estimate of $\lambda_{g} | x_{g}$?
+
+\begin{align}
+\mathrm{E} \big( \lambda_{g} | x_{g}, \mu, \sigma \big) &= \int_{0}^{\infty} \lambda \Pr(\lambda | x_{g}, \mu, \sigma) d \lambda 
+\notag \\
+&= \int_{0}^{\infty} \lambda \frac{\Pr(\lambda \cap x_{g} | \mu, \sigma)}{\Pr(x | \mu, \sigma)} d\lambda 
+\notag 
+\\
+&= \frac{1}{\Pr(x | \mu, \sigma )} \int_{0}^{\infty} \lambda \Pr(\lambda \cap x_{g} | \mu, \sigma) d\lambda,
+\notag
+\end{align}
+since the denominator does not depend on $\lambda$.  In fact, the denominator is the  easy part to estimate since we can use the `dpoilog` function from the R package [poilog](https://cran.r-project.org/web/packages/poilog/).  The numerator, however is difficult.  We can use some tricks to figure out how to estimate it.
+$$
+\begin{aligned}
+\int_{0}^{\infty} \lambda \Pr ( \lambda \cap x | \mu, \sigma) &= \int_{0}^{\infty} \lambda \frac{\lambda^{x} e^{-\lambda}}{x!} \frac{1}{\lambda \sigma \sqrt{2 \pi}} \text{exp} \big( \frac{ - ( \log \lambda - \mu)^{2}}{2 \sigma^{2}} \big) d \lambda
+\notag \\
+&= (x+1) \int_{0}^{\infty} \frac{\lambda^{x+1} e^{-\lambda}}{(x + 1)!} \frac{1}{\lambda 2 \sigma \sqrt{2 \pi}}  \text{exp} \big( \frac{ - ( \log \lambda - \mu)^{2}}{2 \sigma^{2}} \big) d \lambda
+\notag \\
+&= (x + 1) \Pr(x + 1 | \mu, \sigma).
+\end{aligned}
+$$
+Therefore 
+$$
+\mathrm{E} \big( \lambda_{g} | x_{g}, \mu, \sigma \big) = (x_{g} + 1) \frac{\Pr(x_{g} + 1 | \mu, \sigma)}{\Pr(x_{g} | \mu, \sigma)}
+$$
+This formula looks very familiar.  In fact it is the classic [Good-Turing estimator](https://www.ling.upenn.edu/courses/cogs502/GoodTuring1953.pdf), which was derived in the non-parametric setting and would make sense to also hold here. 
+
+Note that if we just add one to the counts, this is equivalent to the above formula with $\Pr(x) = \Pr(x + 1)$ for all $x$.  Or in other words we put a uniform distribution on the probability of each count.  This is also known as [Laplace's rule of succession](https://en.wikipedia.org/wiki/Rule_of_succession).  
+
+### Including zero-inflation
+
+A common issue in NGS data analysis is zero inflation.  This may occur if a molecule "drops out" of the library, e.g. see [this review](https://www.annualreviews.org/doi/abs/10.1146/annurev-genom-090413-025352?journalCode=genom).  The idea was that molecules would literally get stuck to a test tube and drop out of the sample.  To model this we can include a zero-inflation part to the model so that 
+$$ 
+\Pr(\lambda) = p \, 1(\lambda = 0) + (1 - p) \, \text{log-Normal}(\mu, \sigma).
+$$
+
+A standard way to fit this is to fit a zero-truncated distribution to the non-zero counts and then attribute the missing zero mass to zero-inflation.
+
+Following the work from above, if $x_{g} > 0$ then necessarily $\lambda_{g} > 0$ and so the previously derived formula holds.  However, if $x_{g} = 0$ then there is some chance that $\lambda_{g} = 0$.  Therefore 
+$$
+\begin{aligned}
+\mathrm{E}(\lambda_{g} | x_{g} = 0, p, \mu, \sigma) 
+&= p \cdot 0 + (1 - p) \frac{\Pr(1 | \mu, \sigma)}{\Pr(0 | \mu, \sigma)}.
+\end{aligned}
+$$
+
+Essentially the zero-inflation will push $\lambda$ towards $0$.  
+
+## Comparing smoothed vs unsmoothed estimates 
+
+To illustrate and compare the smoothed versus unsmoothed estimates I'll use my usual dataset, the [Toronto Knockout Library Experiments](http://tko.ccbr.utoronto.ca/).  
+
+```{r message=F}
+require(poilog)
+estimate_lnp <- function(counts){
+  lnorm_fit = poilog::poilogMLE(counts, zTrunc = FALSE)
+  return(list(mu = lnorm_fit[['par']]['mu'], 
+              sig = lnorm_fit[['par']]['sig']))
+}
+
+estimate_zilnp <- function(counts){
+  ztlnorm_fit = poilog::poilogMLE(counts[counts > 0], zTrunc = TRUE)
+  p0 = poilog::dpoilog(0, mu = ztlnorm_fit[['par']]['mu'], sig = ztlnorm_fit[['par']]['sig'])
+  D = sum(counts > 0)
+  n0 = D*p0/(1.0 - p0)
+  p = (length(counts) - n0)/length(counts)
+  return(list(mu = ztlnorm_fit[['par']]['mu'], 
+              sig = ztlnorm_fit[['par']]['sig'],
+              p = p))
+}
+
+smooth_counts_lnp <-function(counts, mu, sigma, p0 = 0){
+  smoothed_table = data.frame(x = unique(counts))
+  if(p0 == 0){
+    smoothed_table['lambda'] = sapply(smoothed_table['x'],
+                                      function(x) (x + 1)*poilog::dpoilog(x + 1, mu = mu, sig = sigma)/poilog::dpoilog(x, mu = mu, sig = sigma))
+  }
+  else{
+    smoothed_table['lambda'] = sapply(smoothed_table['x'],
+                                      function(x) (x + 1)*poilog::dpoilog(x + 1, mu = mu, sig = sigma)/poilog::dpoilog(x, mu = mu, sig = sigma))
+    # with zero-inflation have to move the 0 count down
+    smoothed_table$lambda[smoothed_table$x == 0] = (1 - p)*smoothed_table$lambda[smoothed_table$x == 0]
+  }
+  lambdas = smoothed_table$lambda[match(counts, smoothed_table$x)]
+  return(lambdas)
+}
+
+```
+
+```{r}
+# since the column names are not the same for each library we will have to do each library separately
+lib = 'DLD1'
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$DLD_T0
+counts_lnp_fit = estimate_lnp(counts)
+print("log norm fit:")
+print(counts_lnp_fit)
+counts_compare = data.frame(original_counts = counts, 
+                            corrected_counts = smooth_counts_lnp(counts,
+                                                                 mu = counts_lnp_fit[['mu']],
+                                                                 sigma = counts_lnp_fit[['sig']]))
+library(ggplot2)
+ggplot(data.frame(counts = counts + 1), aes(x = counts)) + geom_density() + theme_bw() + ggtitle("density of original counts (+ 1), log scale") + scale_x_log10()
+ggplot(data.frame(counts = counts_compare$corrected_counts), aes(x = counts)) + geom_density() + theme_bw() + ggtitle("density of smoothed counts, log scale") + scale_x_log10()
+ggplot(counts_compare, aes(x = original_counts + 1, y = corrected_counts)) +geom_point(alpha = 0.33) + geom_abline(intercept = 0, slope = 1, color = "red") + scale_y_log10() + scale_x_log10() + theme_bw() + ggtitle("comparison of original and smoothed counts")
+head(counts_compare)
+```
+
+So what we see happening is that the abundance of the small counts get pushed up and the abundance of the large counts gets pushed down.  This is the smoothing aspect of the log-normal Poisson prior.
+
+Now let's look at the zero-inflated version.  
+
+```{r}
+counts_zilnp_fit = estimate_zilnp(counts)
+print("zero-inflated log norm fit:")
+for(par in counts_zilnp_fit){
+  print(par)
+}
+```
+
+
+Because $p$ is estimated as so close to zero, it's hard to say that the zero-inflation fit is appropriate.  
+
+
+### Application of the smoothed lambdas: estimating Gini coefficient
+
+The MACGeCK software package proposed the use of the Gini coefficient for quality control analysis of CRISPR pooled screens.  This is computed using log-transformed abundances.  Let's look at a comparison of the unsmoothed versus the smoothed Gini coefficients.  
+
+What's interesting about using the smoothed counts is that we don't need to add one before taking the log, as you need to do with the original counts because you can't take the log of zero counts.  
+
+```{r}
+gini_coef <-function(y){
+  y_sorted = sort(y, decreasing = F)
+  n = length(y)
+  denom = sum(y)
+  num = sum((n + 1 -1:n)*y_sorted)
+  return((n + 1 - 2*num/denom)/n)
+}
+
+libs = c("DLD1", "GBM", "HCT116_1", "HCT116_2", "HeLa", "RPE1")
+gini_df = data.frame(lib = libs, original_gini_coeff = 0, 
+                     smoothed_gini_coeff = 0)
+# for some reason the authors didn't use a consistent naming schema,
+# so we can't loop over the libraries
+lib = "DLD1"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$DLD_T0
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+gini_df$original_gini_coeff[gini_df$lib == lib] = gini_coef(log(counts + 1))
+gini_df$smoothed_gini_coeff[gini_df$lib == lib] = gini_coef(log(corrected_counts + 1))
+
+
+lib = "GBM"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T0
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+gini_df$original_gini_coeff[gini_df$lib == lib] = gini_coef(log(counts + 1))
+gini_df$smoothed_gini_coeff[gini_df$lib == lib] = gini_coef(log(corrected_counts ))
+
+
+lib = "HCT116_1"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$LIB1_T0
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+gini_df$original_gini_coeff[gini_df$lib == lib] = gini_coef(log(counts + 1))
+gini_df$smoothed_gini_coeff[gini_df$lib == lib] = gini_coef(log(corrected_counts ))
+
+lib = "HCT116_2"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T0
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+gini_df$original_gini_coeff[gini_df$lib == lib] = gini_coef(log(counts + 1))
+gini_df$smoothed_gini_coeff[gini_df$lib == lib] = gini_coef(log(corrected_counts))
+
+lib = "HeLa"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T0
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+gini_df$original_gini_coeff[gini_df$lib == lib] = gini_coef(log(counts + 1))
+gini_df$smoothed_gini_coeff[gini_df$lib == lib] = gini_coef(log(corrected_counts))
+
+lib = "RPE1"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T0
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+gini_df$original_gini_coeff[gini_df$lib == lib] = gini_coef(log(counts + 1))
+gini_df$smoothed_gini_coeff[gini_df$lib == lib] = gini_coef(log(corrected_counts))
+
+df = data.frame(gini_coef = c(gini_df$original_gini_coeff, 
+                              gini_df$smoothed_gini_coeff),
+                type = rep(c("unsmoothed", "smoothed"), each = length(libs)),
+                lib = rep(gini_df$lib, times = 2))
+ggplot(df, aes(x = lib, y = gini_coef, color = type, fill = type)) + geom_bar(stat = 'identity', position = 'dodge') + scale_fill_brewer(palette = 'Set1') + scale_colour_brewer(palette = 'Set1') + ggtitle("day 0 Gini coefficients") + theme_bw()
+```
+
+```{r}
+gini_coef <-function(y){
+  y_sorted = sort(y, decreasing = F)
+  n = length(y)
+  denom = sum(y)
+  num = sum((n + 1 -1:n)*y_sorted)
+  return((n + 1 - 2*num/denom)/n)
+}
+
+libs = c("DLD1", "GBM", "HCT116_1", "HCT116_2", "HeLa", "RPE1")
+post_sel_gini_df = data.frame(lib = libs, original_gini_coeff = 0, 
+                     smoothed_gini_coeff = 0)
+# for some reason the authors didn't use a consistent naming schema,
+# so we can't loop over the libraries
+lib = "DLD1"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$DLD_ETOH_R1
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+post_sel_gini_df$original_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(counts + 1))
+post_sel_gini_df$smoothed_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(corrected_counts + 1))
+
+
+lib = "GBM"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T21A
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+post_sel_gini_df$original_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(counts + 1))
+post_sel_gini_df$smoothed_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(corrected_counts ))
+
+
+lib = "HCT116_1"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$LIB1_T18_A
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+post_sel_gini_df$original_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(counts + 1))
+post_sel_gini_df$smoothed_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(corrected_counts ))
+
+lib = "HCT116_2"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T18A
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+post_sel_gini_df$original_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(counts + 1))
+post_sel_gini_df$smoothed_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(corrected_counts))
+
+lib = "HeLa"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T18A
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+post_sel_gini_df$original_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(counts + 1))
+post_sel_gini_df$smoothed_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(corrected_counts))
+
+lib = "RPE1"
+lib_path = paste0('readcount-', lib, '-lib1')
+counts_df = read.table(file = lib_path, header = T)
+counts = counts_df$T18A
+counts_lnp_fit = estimate_lnp(counts)
+corrected_counts = smooth_counts_lnp(counts,
+                                     mu = counts_lnp_fit[['mu']],
+                                     sigma = counts_lnp_fit[['sig']])
+post_sel_gini_df$original_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(counts + 1))
+post_sel_gini_df$smoothed_gini_coeff[post_sel_gini_df$lib == lib] = gini_coef(log(corrected_counts))
+
+df = data.frame(gini_coef = c(post_sel_gini_df$original_gini_coeff, 
+                              post_sel_gini_df$smoothed_gini_coeff),
+                type = rep(c("unsmoothed", "smoothed"), each = length(libs)),
+                lib = rep(post_sel_gini_df$lib, times = 2))
+ggplot(df, aes(x = lib, y = gini_coef, color = type, fill = type)) + geom_bar(stat = 'identity', position = 'dodge') + scale_fill_brewer(palette = 'Set1') + scale_colour_brewer(palette = 'Set1') + ggtitle("post-selection Gini coefficients") + theme_bw()
+```
+
+```{r}
+df = data.frame(gini_coef = c(gini_df$original_gini_coeff,
+                         gini_df$smoothed_gini_coeff,
+                         post_sel_gini_df$original_gini_coeff, 
+                         post_sel_gini_df$smoothed_gini_coeff),
+           type = rep(rep(c("unsmoothed", "smoothed"), each = length(libs)), times = 2),
+           lib = rep(post_sel_gini_df$lib, times = 4),
+           selection = rep(c("before", "post"), each = 2*length(libs)))
+ggplot(df, aes(x = lib, y = gini_coef, color = type, fill = type, alpha = selection)) + geom_bar(stat = 'identity', position = 'dodge') + scale_fill_brewer(palette = 'Set1') + scale_colour_brewer(palette = 'Set1') + ggtitle("Gini coefficients") + theme_bw()
+```
+
+## Using the log-Normal smoothing
+
+The log-Normal smoothing is a great and sensible alternative to the classic procedure of adding 1 to the counts.  For a pre-selection library, this is quite sensible because we have good reason to expect a log-Normal Poisson distribution.  However, after selection we might not expect that.  For example, cancer growth screens tend to show very high signal.  So high that the non-selected genes nearly disappear from the library.  In this case, a log-Normal mixture Poisson might be more appropriate.  When applying the regular log-Normal distribution, there will be too more smoothing of the counts (of the mixtures toward each other) than we should expect in reality. However, one unanswered question is whether this is better than the standard practice of adding one to the counts. 
