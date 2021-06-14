@@ -18,9 +18,9 @@ The log-Normal Poisson distribution is the natural distribution to model the seq
 \tag{1}
 \end{equation}
 
-copies of a specific sgRNA in the pool, where $\epsilon_{i}$ are random variables with some mean < 1.  Note that they are not identically distributed because they depend on the outcomes of the previous rounds of PCR.   Taking the log of equation 1 we get that the number of molecules is proportional to the sum of random variables with the same mean.  If $R$ is large enough then we can invoke the Central Limit Theorem and get that the log of the number of molecules is approximately Normally distributed.  Since sequencing essentially samples molecules from the pool in proportion to their abundance, we get our desired Poisson log-Normal distribution for the number of sequenced molecules.
+copies of a specific sgRNA in the pool, where $\epsilon_{i}$ are random variables with some mean < 1.  Note that they are not identically distributed because they depend on the outcomes of the previous rounds of PCR.   Taking the log of equation 1 we get that the number of molecules is proportional to the sum of random variables with the same mean.  If $R$ is large enough then we can invoke the Central Limit Theorem and get that the log of the number of molecules is approximately Normally distributed.  Since sequencing essentially samples molecules from the pool in proportion to their abundance, we get our desired log-Normal Poisson distribution for the number of sequenced molecules.
 
-# Using the Poisson log-Normal to estimate abundance
+# Using the log-Normal Poisson distribution to estimate abundance
 
 For a lot of applications we are interested in estimating the abundance of each spacer  So given a sgRNA $g$ with count $x_{g}$,  we want to estimate $\mathrm{E} (\lambda_{g} | x_{g})$.  It makes sense here to pool information from the whole library to make inferences at each indivdual guide, so we can estimate the (log-Normal) parameters of the pool and then use those to estimate the posterior abundance of each spacer. 
 
@@ -91,7 +91,7 @@ estimate_zilnp <- function(counts){
   p0 = poilog::dpoilog(0, mu = ztlnorm_fit[['par']]['mu'], sig = ztlnorm_fit[['par']]['sig'])
   D = sum(counts > 0)
   n0 = D*p0/(1.0 - p0)
-  p = (length(counts) - n0)/length(counts)
+  p = 1 - (length(counts) - n0)/length(counts)
   return(list(mu = ztlnorm_fit[['par']]['mu'], 
               sig = ztlnorm_fit[['par']]['sig'],
               p = p))
@@ -142,9 +142,7 @@ Now let's look at the zero-inflated version.
 ```{r}
 counts_zilnp_fit = estimate_zilnp(counts)
 print("zero-inflated log norm fit:")
-for(par in counts_zilnp_fit){
-  print(par)
-}
+print(counts_zilnp_fit)
 ```
 
 

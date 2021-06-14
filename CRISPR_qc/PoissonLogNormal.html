@@ -264,9 +264,9 @@ div.tocify {
 \big(  \ldots \big( \big( 2^{\epsilon_{1} } \big)^{\epsilon_{2}} \big)^{\epsilon_{3}} \ldots \big)^{\epsilon_{R}} = 2^{\sum_{i=1}^{R} \epsilon_{i}}
 \tag{1}
 \end{equation}\]</span></p>
-<p>copies of a specific sgRNA in the pool, where <span class="math inline">\(\epsilon_{i}\)</span> are random variables with some mean &lt; 1. Note that they are not identically distributed because they depend on the outcomes of the previous rounds of PCR. Taking the log of equation 1 we get that the number of molecules is proportional to the sum of random variables with the same mean. If <span class="math inline">\(R\)</span> is large enough then we can invoke the Central Limit Theorem and get that the log of the number of molecules is approximately Normally distributed. Since sequencing essentially samples molecules from the pool in proportion to their abundance, we get our desired Poisson log-Normal distribution for the number of sequenced molecules.</p>
-<div id="using-the-poisson-log-normal-to-estimate-abundance" class="section level1">
-<h1>Using the Poisson log-Normal to estimate abundance</h1>
+<p>copies of a specific sgRNA in the pool, where <span class="math inline">\(\epsilon_{i}\)</span> are random variables with some mean &lt; 1. Note that they are not identically distributed because they depend on the outcomes of the previous rounds of PCR. Taking the log of equation 1 we get that the number of molecules is proportional to the sum of random variables with the same mean. If <span class="math inline">\(R\)</span> is large enough then we can invoke the Central Limit Theorem and get that the log of the number of molecules is approximately Normally distributed. Since sequencing essentially samples molecules from the pool in proportion to their abundance, we get our desired log-Normal Poisson distribution for the number of sequenced molecules.</p>
+<div id="using-the-log-normal-poisson-distribution-to-estimate-abundance" class="section level1">
+<h1>Using the log-Normal Poisson distribution to estimate abundance</h1>
 <p>For a lot of applications we are interested in estimating the abundance of each spacer So given a sgRNA <span class="math inline">\(g\)</span> with count <span class="math inline">\(x_{g}\)</span>, we want to estimate <span class="math inline">\(\mathrm{E} (\lambda_{g} | x_{g})\)</span>. It makes sense here to pool information from the whole library to make inferences at each indivdual guide, so we can estimate the (log-Normal) parameters of the pool and then use those to estimate the posterior abundance of each spacer.</p>
 <div id="estimating-the-posterior-abundance" class="section level2">
 <h2>Estimating the posterior abundance</h2>
@@ -321,7 +321,7 @@ estimate_zilnp &lt;- function(counts){
   p0 = poilog::dpoilog(0, mu = ztlnorm_fit[[&#39;par&#39;]][&#39;mu&#39;], sig = ztlnorm_fit[[&#39;par&#39;]][&#39;sig&#39;])
   D = sum(counts &gt; 0)
   n0 = D*p0/(1.0 - p0)
-  p = (length(counts) - n0)/length(counts)
+  p = 1 - (length(counts) - n0)/length(counts)
   return(list(mu = ztlnorm_fit[[&#39;par&#39;]][&#39;mu&#39;], 
               sig = ztlnorm_fit[[&#39;par&#39;]][&#39;sig&#39;],
               p = p))
@@ -382,14 +382,17 @@ ggplot(data.frame(counts = counts + 1), aes(x = counts)) + geom_density() + them
 <pre class="r"><code>counts_zilnp_fit = estimate_zilnp(counts)
 print(&quot;zero-inflated log norm fit:&quot;)</code></pre>
 <pre><code>## [1] &quot;zero-inflated log norm fit:&quot;</code></pre>
-<pre class="r"><code>for(par in counts_zilnp_fit){
-  print(par)
-}</code></pre>
-<pre><code>##       mu 
+<pre class="r"><code>print(counts_zilnp_fit)</code></pre>
+<pre><code>## $mu
+##       mu 
 ## 6.055796 
+## 
+## $sig
 ##       sig 
 ## 0.8173307 
-## [1] 1</code></pre>
+## 
+## $p
+## [1] 1.343549e-09</code></pre>
 <p>Because <span class="math inline">\(p\)</span> is estimated as so close to zero, it’s hard to say that the zero-inflation fit is appropriate.</p>
 <div id="application-of-the-smoothed-lambdas-estimating-gini-coefficient" class="section level3">
 <h3>Application of the smoothed lambdas: estimating Gini coefficient</h3>
