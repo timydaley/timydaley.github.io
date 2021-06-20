@@ -1,5 +1,5 @@
 ---
-title: "A collection of thoughts and essays about statistics"
+title: "A collection of thoughts and essays, mostly about statistics"
 author:  "[Timothy Daley](https://timydaley.github.io/)"
 output:
   html_document:
