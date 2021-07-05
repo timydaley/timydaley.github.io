@@ -11,7 +11,7 @@ navbar:
     - text: "Good-Turing as an alternative to adding 1"
       href: CRISPR_qc/logNormalPoissonGoodTuring.html
     - text: "signal to noise ratio in CRISPR pooled screens"
-      href: CRISPR_qc/CorrelationsBreakdown.html
+      href: CRISPR_qc/CorrelationBreakdown.html
 output_dir: "."
 output:
   html_document:
