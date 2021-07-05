@@ -9,7 +9,9 @@ navbar:
     - text: "empirical estimation of FDRs"
       href: empiricalFDR.html
     - text: "Good-Turing as an alternative to adding 1"
-      href: CRISPR_qc/logNormalPoissonGoodTuring.html 
+      href: CRISPR_qc/logNormalPoissonGoodTuring.html
+    - text: "signal to noise ratio in CRISPR pooled screens"
+      href: CRISPR_qc/CorrelationsBreakdown.html
 output_dir: "."
 output:
   html_document:

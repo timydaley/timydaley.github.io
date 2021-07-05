@@ -1,0 +1,220 @@
+---
+title: "Thoughts about correlation between libraries in CRISPR screening experiments"
+author: "Timothy Daley"
+date: "6/13/2021"
+output:
+  html_document:
+    fig_height: 7
+    fig_width: 7
+    toc: yes
+    code_folding: hide
+    toc_float: yes
+---
+
+This essay arises out of an argument with another researcher about the nature and interpretation of correlations of counts between replicates and conditions in a CRISPR screening experiment.   A lot of researchers have the mindset that high correlation between replicates and experiments is a good thing, because that indicates that most of the noise is sampling noise.  However, I don't think that this is true.  It might seem counterintiutive that high correlation is not good, but I hope that the toy examples I provide will help to convince you that this is not the case.  
+
+Consider an extreme toy example.  Suppose that all guides are represented in the library at uniformly equal abundance.  Then the only noise would be sampling noise, which would mean that the correlation between the control replicates will be $0$.  For the corresponding treatment replicates, assuming a standard matched control-treatment design, the guides targeting true hit genes would have positive correlation because of the selection effects.  All other guides would have zero correlation between replicates.
+
+Let's consider a specific example.  Suppose we have 100,000 guides and 10,000,000 (ten million) reads, for an average sequencing depth of 100 reads per guide.  If all guides have the same abundance, then the replicates will look as follows.
+
+```{r}
+n_guides = 100000
+avg_seq_depth = 100
+counts_df = data.frame(replicate_1 = log(rpois(n_guides, avg_seq_depth) + 1),
+                       replicate_2 = log(rpois(n_guides, avg_seq_depth) + 1))
+library(ggplot2)
+library(ggpubr)
+ggplot(counts_df, aes(x = replicate_1, y = replicate_2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of perfect experimental replicates") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+```
+
+
+
+Now let's consider the case where the abundances are not equal.  What happens?  
+
+Let's assume that the changes in abundances due to technical effects are normally distributed on the log scale and that this change is consistent between replicates.  What happens as there's more spread in the abundances?
+
+```{r}
+lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1))
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(replicate_1 = log(rpois(n_guides, lambdas) + 1),
+                       replicate_2 = log(rpois(n_guides, lambdas) + 1))
+ggplot(counts_df, aes(x = replicate_1, y = replicate_2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of somewhat correlated experimental replicates") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+
+lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.75))
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(replicate_1 = log(rpois(n_guides, lambdas) + 1),
+                       replicate_2 = log(rpois(n_guides, lambdas) + 1))
+ggplot(counts_df, aes(x = replicate_1, y = replicate_2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of highly correlated experimental replicates") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+```
+
+We see that as the technical effects increase relative to the sampling effects then the correlation between replicates increases. 
+
+## Treatment replicates
+
+What about the treatment replicates?  There will be consistent changes in a few guides, compared to the control.  This should result in a relative increase in the correlation, from the control to the treatment.  
+
+```{r}
+lambdas = rep(avg_seq_depth, times = n_guides)
+n_positive = 2000
+# average log fold change of 2ish
+lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(replicate_1 = log(rpois(n_guides, lambdas) + 1),
+                       replicate_2 = log(rpois(n_guides, lambdas) + 1))
+ggplot(counts_df, aes(x = replicate_1, y = replicate_2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of a high signal to noise experiment treatment replicates") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+print(paste0("mean of true hit guides: ", 
+             mean(lambdas[1:n_positive])))
+print(paste0("mean of null guides: ", 
+             mean(lambdas[(n_positive+1):length(lambdas)])))
+```
+
+```{r}
+lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1))
+n_positive = 2000
+# average log fold change of 2ish
+lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(replicate_1 = log(rpois(n_guides, lambdas) + 1),
+                       replicate_2 = log(rpois(n_guides, lambdas) + 1))
+ggplot(counts_df, aes(x = replicate_1, y = replicate_2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of a medium signal to noise experimental treatment replicates") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+print(paste0("mean of true hit guides: ", 
+             mean(lambdas[1:n_positive])))
+print(paste0("mean of null guides: ", 
+             mean(lambdas[(n_positive+1):length(lambdas)])))
+```
+
+```{r}
+lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.75))
+n_positive = 2000
+# average log fold change of 2ish
+lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(replicate_1 = log(rpois(n_guides, lambdas) + 1),
+                       replicate_2 = log(rpois(n_guides, lambdas) + 1))
+ggplot(counts_df, aes(x = replicate_1, y = replicate_2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of a low signal to noise experimental treatment replicates") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+print(paste0("mean of true hit guides: ", 
+             mean(lambdas[1:n_positive])))
+print(paste0("mean of null guides: ", 
+             mean(lambdas[(n_positive+1):length(lambdas)])))
+```
+
+We see that as the technical noise increases, the change in correlation due to the signal is decreased.  This seems to indicate that it will be more difficult to identify the true signal guides from the background null guides.  
+Now let's consider a specific case, where we specify the generating distribution.
+
+# A formal model-based approach
+
+Let's now take a more formal approach by making some model-based assumptions. Suppose that the abundances are determined by three effects:
+- sampling effects;
+- technical effects that are consistent between replicates; 
+- on target selection effects, which will only be present in the treatment samples.
+
+For the moment let's assume simple Poisson sampling, so that the expected correlation from sampling is zero.  This is obviously a simplification, since we expect overdispersion in the counts, but this assumption will allow us make valuable insights.  Like my old PDE professor [Dr Wang](https://scholar.google.com/citations?user=w9tff4YAAAAJ&hl=en&oi=sra) would say, "We lie so that we can see the truth."
+
+Let $x_{ij}$ be the count of guide $i$ in library $j$ and let $\lambda_{ij}$ be the corresponding expected count, which we will call the abundance (and $p_{ij} = \lambda_{ij}/\sum_{k = 1}^{N} \lambda_{kj}$ is relative abundance).  We'll assume, as previously, that effects happen on the log scale.  
+$$
+\log \lambda_{ij} = \mathrm{E}(\log \lambda_{ij}) + \epsilon_{ij} + \zeta_{ij} + \eta_{ij},
+$$
+where $\epsilon_{ij}$ are random effects (part of the sampling effects); $\zeta_{ij}$ are the technical effects; and $\eta_{ij}$ are selection effects. 
+
+We will assume (for the moment) that the random effects are zero.  The others, however, will not be zero.  We shall assume that technical effects affect the initial abundance of the library and are consistent between replicates, i.e. $\eta_{ij} = \eta_{ik}$ for all $j$, $k$. The selection effects only affect the treatment conditions, e.g. $\nu_{ij} = 0$ for $j \in \text{ control}$.  We assume that the selection effects are positive (typical for CRISPRa screens, while CRISPRi/ko tend to be negative).  An increase in abundance for some molecules will cause a decrease in the relative abundance of all other molecules.  To make our calculations easier we will ignore this (because otherwise we're gonna have some constant terms floating around, which won't affect the variance/covariance calculation anyways).  
+
+## Variance calculations
+
+
+Because the effects are independent and additive (in the log space), we can calculate the variance as follows,
+$$
+ \text{Var} (\log \lambda_{\cdot j}) = \text{Var} (\epsilon) + \text{Var} (\eta) + 1(j \in \text{treatment} ) \text{Var}(\nu_{\cdot j}).
+$$
+
+## Covariance
+
+For two libraries $j, k$ from the control condition, the covariance can be calculated as follows.
+\begin{align}
+\text{Cov}(\log \lambda_{\cdot j}, \log \lambda_{\cdot k}) &= \mathrm{E} \big( (\log \lambda_{\cdot j} - \mathrm{E} (\log \lambda_{\cdot j})) (\log \lambda_{\cdot k} - \mathrm{E} (\log \lambda_{\cdot k}))  \big)
+\notag \\
+&= \mathrm{E} \big( (\epsilon_{\cdot j} + \zeta_{\cdot j} + \eta_{\cdot j}) (\epsilon_{\cdot k} + \zeta_{\cdot k} + \eta_{\cdot k}) \big)
+\notag \\
+&=  \mathrm{E}(\zeta_{\cdot j} \zeta_{\cdot k}),
+\end{align}
+where the last part follows from the independence between the types of errors, the selection effects are zero, and sampling effects are independent between replicates.
+
+For two libraries $j, k$ from the treatment condition we can calculate the covariance as,
+\begin{align}
+\text{Cov}(\log \lambda_{\cdot j}, \log \lambda_{\cdot k}) &= \mathrm{E} \big( (\log \lambda_{\cdot j} - \mathrm{E} (\log \lambda_{\cdot j})) (\log \lambda_{\cdot k} - \mathrm{E} (\log \lambda_{\cdot k}))  \big)
+\notag \\
+&= \mathrm{E} \big( (\epsilon_{\cdot j} + \zeta_{\cdot j} + (\eta_{\cdot j} - \mathrm{E} \eta_{\cdot j})) (\epsilon_{\cdot k} + \zeta_{\cdot k} + (\eta_{\cdot k} - \mathrm{E} \eta_{\cdot k})) \big)
+\notag \\
+&=  \mathrm{E}(\zeta_{\cdot j} \zeta_{\cdot k}) + \mathrm{E}((\eta_{\cdot j} - \mathrm{E} \eta_{\cdot j})  (\eta_{\cdot k} - \mathrm{E} \eta_{\cdot k})).
+\end{align}
+
+For a library $j$ from the control replicates and library $k$ from the condition replicates we can calculate the covariance as
+\begin{align}
+\text{Cov}(\log \lambda_{\cdot j}, \log \lambda_{\cdot k}) &= \mathrm{E} \big( (\log \lambda_{\cdot j} - \mathrm{E} (\log \lambda_{\cdot j})) (\log \lambda_{\cdot k} - \mathrm{E} (\log \lambda_{\cdot k}))  \big)
+\notag \\
+&= \mathrm{E} \big( (\epsilon_{\cdot j} + \zeta_{\cdot j} + \eta_{\cdot j}) (\epsilon_{\cdot k} + \zeta_{\cdot k} +(\eta_{\cdot k} - \mathrm{E} \eta_{\cdot k})) \big)
+\notag \\
+&=  \mathrm{E}(\zeta_{\cdot j} \zeta_{\cdot k}).
+\end{align}
+
+We see that under our assumptions that there is higher covariance in the condition replicates, and that this extra covariance is due to the signal part of the experiment.   We can calculate the variance due to signal as the covariance of the treatment replicates minus the covariance of control replicates.  Therefore the ratio of this difference divided by the covariance of the treatment replicates can be taken as the fraction of signal that is due to the selection (signal) effects, and seems like a great idea for a quality control metric.  Let's take a look.
+
+# Fraction of on-target variance as a QC metric
+
+It seems like a reasonable idea to use the correlation instead of the covariance because of possible sequencing depth effects.  
+
+## Examples
+
+### Low technical effects, high signal
+
+```{r message=FALSE}
+lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1))
+n_positive = 2000
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(control_rep1 = log(rpois(n_guides, lambdas) + 1),
+                       control_rep2 = log(rpois(n_guides, lambdas) + 1))
+# average log fold change of 2ish
+lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+counts_df = data.frame(counts_df, 
+                       treatment_rep1 = log(rpois(n_guides, lambdas) + 1),
+                       treatment_rep2 = log(rpois(n_guides, lambdas) + 1),
+                       treatment = factor(c(rep(TRUE, times = n_positive), rep(FALSE, times = n_guides - n_positive))))
+library(GGally)
+ggpairs(counts_df, aes(colour = treatment))
+treat_cor = cor(counts_df$treatment_rep1, counts_df$treatment_rep2)
+control_cor = cor(counts_df$control_rep1, counts_df$control_rep2)
+print(paste0("proportion of variance due to signal: ", 
+             (treat_cor - control_cor)/treat_cor))
+```
+
+### High technical effects, high signal
+
+```{r message=FALSE}
+lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.75))
+n_positive = 2000
+# renormalize to have same mean
+lambdas = avg_seq_depth*lambdas/mean(lambdas)
+counts_df = data.frame(control_rep1 = log(rpois(n_guides, lambdas) + 1),
+                       control_rep2 = log(rpois(n_guides, lambdas) + 1))
+# average log fold change of 2ish
+lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+counts_df = data.frame(counts_df, 
+                       treatment_rep1 = log(rpois(n_guides, lambdas) + 1),
+                       treatment_rep2 = log(rpois(n_guides, lambdas) + 1),
+                       treatment = factor(c(rep(TRUE, times = n_positive), rep(FALSE, times = n_guides - n_positive))))
+library(GGally)
+ggpairs(counts_df, aes(colour = treatment))
+treat_cor = cor(counts_df$treatment_rep1, counts_df$treatment_rep2)
+control_cor = cor(counts_df$control_rep1, counts_df$control_rep2)
+print(paste0("proportion of variance due to signal: ", 
+             (treat_cor - control_cor)/treat_cor))
+```
+
+### Conclusions
+
+We see above, that the effect size remains the same but the the technical noise drowns out the effects, which makes it difficult to determine which are the true hits.  In the low technical noise example, on the other hand, it's clear which are the true hits.  
