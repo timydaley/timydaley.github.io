@@ -18,6 +18,7 @@ Consider an extreme toy example.  Suppose that all guides are represented in the
 Let's consider a specific example.  Suppose we have 100,000 guides and 10,000,000 (ten million) reads, for an average sequencing depth of 100 reads per guide.  If all guides have the same abundance, then the replicates will look as follows.
 
 ```{r}
+set.seed(12345)
 n_guides = 100000
 avg_seq_depth = 100
 counts_df = data.frame(replicate_1 = log(rpois(n_guides, avg_seq_depth) + 1),
@@ -57,7 +58,7 @@ What about the treatment replicates?  There will be consistent changes in a few 
 
 ```{r}
 lambdas = rep(avg_seq_depth, times = n_guides)
-n_positive = 2000
+n_positive = 1000
 # average log fold change of 2ish
 lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
 # renormalize to have same mean
@@ -73,7 +74,7 @@ print(paste0("mean of null guides: ",
 
 ```{r}
 lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1))
-n_positive = 2000
+n_positive = 1000
 # average log fold change of 2ish
 lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
 # renormalize to have same mean
@@ -89,7 +90,7 @@ print(paste0("mean of null guides: ",
 
 ```{r}
 lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.75))
-n_positive = 2000
+n_positive = 1000
 # average log fold change of 2ish
 lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
 # renormalize to have same mean
@@ -165,56 +166,151 @@ We see that under our assumptions that there is higher covariance in the conditi
 
 # Fraction of on-target variance as a QC metric
 
-It seems like a reasonable idea to use the correlation instead of the covariance because of possible sequencing depth effects.  
+An issue with comparing the variance between experiments is that the scales can be different.  In order to control for the scale we can divide by the square roots of the mean sequencing depth of each experiment, which is the standard deviation if the only variance is simple sampling variance.  
+
+One reasonable idea is to use the standard deviations of each experiment, i.e. the correlation.  However, I observed through experimentation that increasing the sampling variance while leaving all other effects the same increased the correlation-based metric.  This is the opposite of what we would want.  
 
 ## Examples
 
 ### Low technical effects, high signal
 
 ```{r message=FALSE}
-lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1))
-n_positive = 2000
+log_lambdas = rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1)
+n_positive = 1000
 # renormalize to have same mean
-lambdas = avg_seq_depth*lambdas/mean(lambdas)
+lambdas = exp(log_lambdas)
+#lambdas = avg_seq_depth*lambdas/mean(lambdas)
 counts_df = data.frame(control_rep1 = log(rpois(n_guides, lambdas) + 1),
                        control_rep2 = log(rpois(n_guides, lambdas) + 1))
 # average log fold change of 2ish
-lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+log_lambdas[1:n_positive] = log_lambdas[1:n_positive] + rnorm(n_positive, mean = 1, 0.5)
+# renormalize to have same mean
+lambdas = exp(log_lambdas)
+#lambdas = avg_seq_depth*lambdas/mean(lambdas)
 counts_df = data.frame(counts_df, 
                        treatment_rep1 = log(rpois(n_guides, lambdas) + 1),
                        treatment_rep2 = log(rpois(n_guides, lambdas) + 1),
                        treatment = factor(c(rep(TRUE, times = n_positive), rep(FALSE, times = n_guides - n_positive))))
-library(GGally)
-ggpairs(counts_df, aes(colour = treatment))
-treat_cor = cor(counts_df$treatment_rep1, counts_df$treatment_rep2)
-control_cor = cor(counts_df$control_rep1, counts_df$control_rep2)
+# shuffle data frame for better visualization of positives
+counts_df = counts_df[sample(nrow(counts_df)), ]
+ggplot(counts_df, aes(x = control_rep1, y = control_rep2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of control replicates for a low technical effects, high signal screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+ggplot(counts_df, aes(x = treatment_rep1, y = treatment_rep2, col = treatment)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of treatment replicates for a low technical effects, high signal screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)") + scale_color_manual(values = c("black", "red"))
+treat_stat = cov(counts_df$treatment_rep1, counts_df$treatment_rep2)/(sqrt(mean(counts_df$treatment_rep1))*sqrt(mean(counts_df$treatment_rep2)))
+control_stat = cov(counts_df$control_rep1, counts_df$control_rep2)/(sqrt(mean(counts_df$control_rep1))*sqrt(mean(counts_df$control_rep2)))
+control_cov = cov(counts_df$control_rep1, counts_df$control_rep2)
 print(paste0("proportion of variance due to signal: ", 
-             (treat_cor - control_cor)/treat_cor))
+             (treat_stat - control_stat)/treat_stat))
 ```
 
 ### High technical effects, high signal
 
 ```{r message=FALSE}
-lambdas = exp(rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.75))
-n_positive = 2000
+log_lambdas = rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.5)
+n_positive = 1000
 # renormalize to have same mean
-lambdas = avg_seq_depth*lambdas/mean(lambdas)
+lambdas = exp(log_lambdas)
+#lambdas = avg_seq_depth*lambdas/mean(lambdas)
 counts_df = data.frame(control_rep1 = log(rpois(n_guides, lambdas) + 1),
                        control_rep2 = log(rpois(n_guides, lambdas) + 1))
 # average log fold change of 2ish
-lambdas[1:n_positive] = lambdas[1:n_positive] + exp(rnorm(n_positive, mean = log(avg_seq_depth), 1))
+log_lambdas[1:n_positive] = log_lambdas[1:n_positive] + rnorm(n_positive, 1, 0.5)
+# renormalize to have same mean
+lambdas = exp(log_lambdas)
+#lambdas = avg_seq_depth*lambdas/mean(lambdas)
 counts_df = data.frame(counts_df, 
                        treatment_rep1 = log(rpois(n_guides, lambdas) + 1),
                        treatment_rep2 = log(rpois(n_guides, lambdas) + 1),
                        treatment = factor(c(rep(TRUE, times = n_positive), rep(FALSE, times = n_guides - n_positive))))
-library(GGally)
-ggpairs(counts_df, aes(colour = treatment))
-treat_cor = cor(counts_df$treatment_rep1, counts_df$treatment_rep2)
-control_cor = cor(counts_df$control_rep1, counts_df$control_rep2)
+# shuffle data frame for better visualization of positives
+counts_df = counts_df[sample(nrow(counts_df)), ]
+ggplot(counts_df, aes(x = control_rep1, y = control_rep2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of control replicates for a high technical effects, high signal screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+ggplot(counts_df, aes(x = treatment_rep1, y = treatment_rep2, col = treatment)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of treatment replicates for a high technical effects, high signal screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)") + scale_color_manual(values = c("black", "red"))
+treat_stat = cov(counts_df$treatment_rep1, counts_df$treatment_rep2)/(sqrt(mean(counts_df$treatment_rep1))*sqrt(mean(counts_df$treatment_rep2)))
+control_stat = cov(counts_df$control_rep1, counts_df$control_rep2)/(sqrt(mean(counts_df$control_rep1))*sqrt(mean(counts_df$control_rep2)))
+control_cov = cov(counts_df$control_rep1, counts_df$control_rep2)
 print(paste0("proportion of variance due to signal: ", 
-             (treat_cor - control_cor)/treat_cor))
+             (treat_stat - control_stat)/treat_stat))
 ```
 
-### Conclusions
+## Including sampling noise
+
+If we consider the case where sampling noise is bigger than 0.  What we expect to happen is that the covariance stay the same, but the variance of each replicate increases.  This, in turn, will decrease the correlation, particularly in the condition replicates. Let's see some examples.
+
+### Low technical effects, high signal, high sampling noise
+
+```{r message=FALSE}
+log_lambdas = rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.1)
+n_positive = 1000
+# renormalize to have same mean
+rep1_sampling_effects = rnorm(n_guides, 0, 1)
+rep2_sampling_effects = rnorm(n_guides, 0, 1)
+rep1_lambdas = exp(log_lambdas + rep1_sampling_effects)
+#rep1_lambdas = avg_seq_depth*rep1_lambdas/mean(rep1_lambdas)
+rep2_lambdas = exp(log_lambdas + rep2_sampling_effects)
+#rep2_lambdas = avg_seq_depth*rep2_lambdas/mean(rep2_lambdas)
+counts_df = data.frame(control_rep1 = log(rpois(n_guides, rep1_lambdas) + 1),
+                       control_rep2 = log(rpois(n_guides, rep2_lambdas) + 1))
+# average log fold change of 2ish
+log_lambdas[1:n_positive] = log_lambdas[1:n_positive] + rnorm(n_positive, 1, 0.5)
+rep1_sampling_effects = rnorm(n_guides, 0, 0.25)
+rep2_sampling_effects = rnorm(n_guides, 0, 0.25)
+rep1_lambdas = exp(log_lambdas + rep1_sampling_effects)
+#rep1_lambdas = avg_seq_depth*rep1_lambdas/mean(rep1_lambdas)
+rep2_lambdas = exp(log_lambdas + rep2_sampling_effects)
+#rep2_lambdas = avg_seq_depth*rep2_lambdas/mean(rep2_lambdas)
+counts_df = data.frame(counts_df, 
+                       treatment_rep1 = log(rpois(n_guides, rep1_lambdas) + 1),
+                       treatment_rep2 = log(rpois(n_guides, rep2_lambdas) + 1),
+                       treatment = factor(c(rep(TRUE, times = n_positive), rep(FALSE, times = n_guides - n_positive))))
+# shuffle data frame for better visualization of positives
+counts_df = counts_df[sample(nrow(counts_df)), ]
+ggplot(counts_df, aes(x = control_rep1, y = control_rep2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of control replicates for a low technical effects, high signal, high sampling noise screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+ggplot(counts_df, aes(x = treatment_rep1, y = treatment_rep2, col = treatment)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of treatment replicates for a low technical effects, high signal, high sampling noise screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)") + scale_color_manual(values = c("black", "red"))
+treat_stat = cov(counts_df$treatment_rep1, counts_df$treatment_rep2)/(sqrt(mean(counts_df$treatment_rep1))*sqrt(mean(counts_df$treatment_rep2)))
+control_stat = cov(counts_df$control_rep1, counts_df$control_rep2)/(sqrt(mean(counts_df$control_rep1))*sqrt(mean(counts_df$control_rep2)))
+control_cov = cov(counts_df$control_rep1, counts_df$control_rep2)
+print(paste0("proportion of variance due to signal: ", 
+             (treat_stat - control_stat)/treat_stat))
+```
+
+### High technical effects, high signal, high sampling noise
+
+```{r message=FALSE}
+log_lambdas = rep(log(100), times = n_guides) + rnorm(n_guides, 0, 0.5)
+n_positive = 1000
+# renormalize to have same mean
+rep1_sampling_effects = rnorm(n_guides, 0, 1)
+rep2_sampling_effects = rnorm(n_guides, 0, 1)
+rep1_lambdas = exp(log_lambdas + rep1_sampling_effects)
+#rep1_lambdas = avg_seq_depth*rep1_lambdas/mean(rep1_lambdas)
+rep2_lambdas = exp(log_lambdas + rep2_sampling_effects)
+#rep2_lambdas = avg_seq_depth*rep2_lambdas/mean(rep2_lambdas)
+counts_df = data.frame(control_rep1 = log(rpois(n_guides, rep1_lambdas) + 1),
+                       control_rep2 = log(rpois(n_guides, rep2_lambdas) + 1))
+# average log fold change of 2ish
+log_lambdas[1:n_positive] = log_lambdas[1:n_positive] + rnorm(n_positive, mean = 1, 0.5)
+rep1_sampling_effects = rnorm(n_guides, 0, 0.25)
+rep2_sampling_effects = rnorm(n_guides, 0, 0.25)
+rep1_lambdas = exp(log_lambdas + rep1_sampling_effects)
+#rep1_lambdas = avg_seq_depth*rep1_lambdas/mean(rep1_lambdas)
+rep2_lambdas = exp(log_lambdas + rep2_sampling_effects)
+#rep2_lambdas = avg_seq_depth*rep2_lambdas/mean(rep2_lambdas)
+counts_df = data.frame(counts_df, 
+                       treatment_rep1 = log(rpois(n_guides, rep1_lambdas) + 1),
+                       treatment_rep2 = log(rpois(n_guides, rep2_lambdas) + 1),
+                       treatment = factor(c(rep(TRUE, times = n_positive), rep(FALSE, times = n_guides - n_positive))))
+# shuffle data frame for better visualization of positives
+counts_df = counts_df[sample(nrow(counts_df)), ]
+ggplot(counts_df, aes(x = control_rep1, y = control_rep2)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of control replicates for a high technical effects, high signal, high sampling noise screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)")
+ggplot(counts_df, aes(x = treatment_rep1, y = treatment_rep2, col = treatment)) + geom_point(alpha = 0.3) + theme_bw() + stat_cor(method="pearson") + ggtitle("Example correlation of treatment replicates for a high technical effects, high signal, high sampling noise screen") + xlab("log(counts + 1)") + ylab("log(counts + 1)") + scale_color_manual(values = c("black", "red"))
+treat_stat = cov(counts_df$treatment_rep1, counts_df$treatment_rep2)/(sqrt(mean(counts_df$treatment_rep1))*sqrt(mean(counts_df$treatment_rep2)))
+control_stat = cov(counts_df$control_rep1, counts_df$control_rep2)/(sqrt(mean(counts_df$control_rep1))*sqrt(mean(counts_df$control_rep2)))
+control_cov = cov(counts_df$control_rep1, counts_df$control_rep2)
+print(paste0("proportion of variance due to signal: ", 
+             (treat_stat - control_stat)/treat_stat))
+```
+
+
+# Conclusions
 
 We see above, that the effect size remains the same but the the technical noise drowns out the effects, which makes it difficult to determine which are the true hits.  In the low technical noise example, on the other hand, it's clear which are the true hits.  
