@@ -11,7 +11,13 @@ output:
     toc_float: yes
 ---
 
-This essay arises out of an argument with another researcher about the nature and interpretation of correlations of counts between replicates and conditions in a CRISPR screening experiment.   A lot of researchers have the mindset that high correlation between replicates and experiments is a good thing, because that indicates that most of the noise is sampling noise.  However, I don't think that this is true.  It might seem counterintiutive that high correlation is not good, but I hope that the toy examples I provide will help to convince you that this is not the case.  
+This post arises out of an argument I had with another researcher about the nature and interpretation of correlations of counts between replicates and conditions in a CRISPR screening experiment.   A lot of researchers have the mindset that high correlation between replicates and experiments is a good thing, because that indicates that most of the noise is sampling noise.  Now, I'm not talking about the fold changes, but rather the raw count data (e.g. comparing two replicates of the control condition). For example, consider the following quotes:
+
+- "Replicates should correlate most closely with each other" - Hanna \& Doench, Nature Biotech, 2020;
+- "Scatter plots showing all pairwise read-count correlations further indicate that there was very strong concordance of the data between replicates" - Evers et al, Nature Biotech, 2016 (correlation was ~0.99 for control replicates)
+
+
+However, I don't think that this is true.  It might seem counterintiutive that high correlation is not good, but I hope that the toy examples I provide will help to convince you that this is not the case.  
 
 Consider an extreme toy example.  Suppose that all guides are represented in the library at uniformly equal abundance.  Then the only noise would be sampling noise, which would mean that the correlation between the control replicates will be $0$.  For the corresponding treatment replicates, assuming a standard matched control-treatment design, the guides targeting true hit genes would have positive correlation because of the selection effects.  All other guides would have zero correlation between replicates.
 
