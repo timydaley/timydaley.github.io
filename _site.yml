@@ -12,6 +12,8 @@ navbar:
       href: CRISPR_qc/logNormalPoissonGoodTuring.html
     - text: "signal to noise ratio in CRISPR pooled screens"
       href: CRISPR_qc/CorrelationBreakdown.html
+    - text: "What's a test set?"
+      href: crispr_tko/tree_model/tree_model.html
 output_dir: "."
 output:
   html_document:
