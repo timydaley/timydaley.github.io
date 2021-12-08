@@ -14,6 +14,8 @@ navbar:
       href: CRISPR_qc/CorrelationBreakdown.html
     - text: "What's a test set?"
       href: crispr_tko/tree_model/tree_model.html
+    - text: "An intro to the analysis of CRISPR pooled screens"
+      href: IntroToCRISPRiaScreenAnalysis/Intro2CRISPRScreenAnalysis.html
 output_dir: "."
 output:
   html_document:
