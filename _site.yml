@@ -16,6 +16,8 @@ navbar:
       href: crispr_tko/tree_model/tree_model.html
     - text: "An intro to the analysis of CRISPR pooled screens"
       href: IntroToCRISPRiaScreenAnalysis/Intro2CRISPRScreenAnalysis.html
+    - text: "Bioinformatics Engineer Exam"
+      href: EpicBlog/EngineeringInterviewBlogPost.html
 output_dir: "."
 output:
   html_document:
