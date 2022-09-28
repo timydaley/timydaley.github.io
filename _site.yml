@@ -18,6 +18,8 @@ navbar:
       href: IntroToCRISPRiaScreenAnalysis/Intro2CRISPRScreenAnalysis.html
     - text: "Bioinformatics Engineer Exam"
       href: EpicBlog/EngineeringInterviewBlogPost.html
+    - text: "Bias of the Gini coefficient from Poisson sampling"
+      href: gini.html
 output_dir: "."
 output:
   html_document:
