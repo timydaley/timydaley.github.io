@@ -21,7 +21,7 @@ navbar:
     - text: "Bias of the Gini coefficient from Poisson sampling"
       href: gini.html
     - text: "An Introduction to Tree-Based ML Models"
-      href: An\ Introduction\ to\ Tree-based\ ML\ models.pdf
+      href: AnIntroductiontoTree-basedMLmodels.pdf
 output_dir: "."
 output:
   html_document:
