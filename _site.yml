@@ -20,6 +20,8 @@ navbar:
       href: EpicBlog/EngineeringInterviewBlogPost.html
     - text: "Bias of the Gini coefficient from Poisson sampling"
       href: gini.html
+    - text: "An Introduction to Tree-Based ML Models"
+      href: An\ Introduction\ to\ Tree-based\ ML\ models.pdf
 output_dir: "."
 output:
   html_document:
