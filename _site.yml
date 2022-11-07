@@ -22,6 +22,8 @@ navbar:
       href: gini.html
     - text: "An Introduction to Tree-Based ML Models"
       href: AnIntroductiontoTree-basedMLmodels.pdf
+    - text: "An Introduction to Mixture Models"
+      href: AnIntroductionToMixtureModelsAndTheirApplicationInBiologicalSciences.pdf
 output_dir: "."
 output:
   html_document:
