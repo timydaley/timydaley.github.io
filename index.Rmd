@@ -7,6 +7,18 @@ output:
 ---
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 This is a collection of blogs about statistics and statistical learning.  I like writing and spreading knowledge, but I don't like the peer review process. Hence the blog. 
 
 

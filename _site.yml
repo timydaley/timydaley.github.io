@@ -6,24 +6,26 @@ navbar:
       href: FisherVsStouffer.html
     - text: "2 groups"
       href: twoGroupsBackground.html
-    - text: "empirical estimation of FDRs"
+    - text: "empirical FDR"
       href: empiricalFDR.html
-    - text: "Good-Turing as an alternative to adding 1"
+    - text: "Good-Turing vs Laplace"
       href: CRISPR_qc/logNormalPoissonGoodTuring.html
-    - text: "signal to noise ratio in CRISPR pooled screens"
+    - text: "signal to noise ratio in screens"
       href: CRISPR_qc/CorrelationBreakdown.html
     - text: "What's a test set?"
       href: crispr_tko/tree_model/tree_model.html
-    - text: "An intro to the analysis of CRISPR pooled screens"
+    - text: "intro CRISPR screens"
       href: IntroToCRISPRiaScreenAnalysis/Intro2CRISPRScreenAnalysis.html
     - text: "Bioinformatics Engineer Exam"
       href: EpicBlog/EngineeringInterviewBlogPost.html
-    - text: "Bias of the Gini coefficient from Poisson sampling"
+    - text: "Gini Bias"
       href: gini.html
-    - text: "An Introduction to Tree-Based ML Models"
+    - text: "Intro Tree-Based ML Models"
       href: AnIntroductiontoTree-basedMLmodels.pdf
-    - text: "An Introduction to Mixture Models"
+    - text: "Intro Mixture Models"
       href: AnIntroductionToMixtureModelsAndTheirApplicationInBiologicalSciences.pdf
+    - text: "LLM embeddings in SSM"
+      href: ssm/ssm_embed.html
 output_dir: "."
 output:
   html_document:

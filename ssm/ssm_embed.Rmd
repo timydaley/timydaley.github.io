@@ -1,0 +1,22 @@
+---
+title: "SSM embeddings"
+author: "Timothy Daley"
+date: "2023-01-13"
+output:
+  html_document:
+    fig_height: 7
+    fig_width: 7
+    toc: yes
+    code_folding: hide
+    toc_float: yes
+---
+
+A common practice in the use of large language model embeddings in transfer learning is to average the embeddings over the word/sentence length.  We can think of this as kind of bag of words model.  This is because if we average the sentence of the one hot encoding of the sentence we end up with the average occurrence of each word.  However, one of the disadvantages of this approach is that it removes the order structure of the embeddings.  
+
+One argument that averaging embeddings is fine is because the averaged embeddings of random sentences are unlikely to be highly similar, see [Why is it Okay to Average Embeddings?](https://randorithms.com/2020/11/17/Adding-Embeddings).  I was thinking about this in the context of an application I've worked on, Site Saturation Mutagenesis (SSM) screens.  In an SSM screen, you take a starting peptide, generate every possible single point mutation, and then screen these mutants for activity (whatever that activity you desire is).  We then use the results of these screens to train a model that can hopefully extrapolate the activity of peptides far away from starting peptide.  The training data in this case is not random, and is in fact highly similar.  Can we expect that averaging embeddings can work in the case where the original data is so similar?
+
+To test this I generated a random 100 amino acid peptide and the corresponding SSM mutants.  I then used the ESM2 650M parameter model (`esm2_t33_650M_UR50D` from https://github.com/facebookresearch/esm) to generate embeddings for all SSM mutants, 1900 in total (19 amino acid mutations times 100 positions).  I also generated a library of 1900 random 100 amino acid peptides to compare to.  For each library I computed the pairwise euclidean distance of all elements of each library and compared them.  
+
+![Comparison of distances between embeddings of random and SSM peptides](embedding_comparison.png)
+
+We see that the distribution of the pairwise distances of the SSM peptides is different from random peptides, which calls into question the usage of taking the mean of the embeddings for  since it will be more difficult for downstream machine learning algorithms to be able to distinguish the patterns between good and bad peptides (in terms of activity).  
