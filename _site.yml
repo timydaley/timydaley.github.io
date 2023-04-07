@@ -26,8 +26,8 @@ navbar:
       href: presentations/AnIntroductionToMixtureModelsAndTheirApplicationInBiologicalSciences.pdf
     - text: "LLM embeddings in SSM"
       href: ssm/ssm_embed.html
-#    - text: "Learning Man LLM"
-#      href: presentations/LearningMan_LargeLanguageModels.pdf
+    - text: "Learning Man LLM"
+      href: presentations/LearningMan_LargeLanguageModels.pdf
 output_dir: "."
 output:
   html_document:
