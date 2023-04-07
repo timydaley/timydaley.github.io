@@ -21,11 +21,13 @@ navbar:
     - text: "Gini Bias"
       href: gini.html
     - text: "Intro Tree-Based ML Models"
-      href: AnIntroductiontoTree-basedMLmodels.pdf
+      href: presentations/AnIntroductiontoTree-basedMLmodels.pdf
     - text: "Intro Mixture Models"
-      href: AnIntroductionToMixtureModelsAndTheirApplicationInBiologicalSciences.pdf
+      href: presentations/AnIntroductionToMixtureModelsAndTheirApplicationInBiologicalSciences.pdf
     - text: "LLM embeddings in SSM"
       href: ssm/ssm_embed.html
+    - text: "Learning Man LLM"
+      href: presentations/LearningMan_LargeLanguageModels.pdf
 output_dir: "."
 output:
   html_document:
