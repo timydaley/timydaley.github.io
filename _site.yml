@@ -28,6 +28,8 @@ navbar:
       href: ssm/ssm_embed.html
     - text: "Learning Man LLM"
       href: presentations/LearningMan_LargeLanguageModels.pdf
+    - text: "you need a test set"
+      href: you_need_a_test_set/you_need_a_test_set.html
 output_dir: "."
 output:
   html_document:
