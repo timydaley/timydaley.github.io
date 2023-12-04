@@ -32,6 +32,8 @@ navbar:
       href: you_need_a_test_set/you_need_a_test_set.html
     - text: "GMMs vs k-means"
       href: kmeans_gmm/gmm_vs_kmeans.html
+    - text: "Lindsey's method"
+      href: lindseys_method/Lindseys_method.html
 output_dir: "."
 output:
   html_document:
