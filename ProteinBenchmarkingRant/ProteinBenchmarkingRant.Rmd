@@ -1,0 +1,42 @@
+---
+title: "The Problem with Benchmark Datasets for Protein Engineering"
+author: "Timothy Daley"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+The reviews of our submission to NeurIPs this past year ([link](https://openreview.net/forum?id=7yO8G3n9zZ)) got me thinking about a particular problem in the field of protein engineering.  The most of the reviews  mentioned the problem of comparing to existing benchmark in the ML protein engineering space.  However, it is my opinion that these benchmarks are practically useless in the real application of ML-guided protein engineering, as I will lay out here.  
+
+The problems with benchmarks can be summarized into two main buckets:
+- Combinatorial explosion of the search space limits the types of benchmarks or results in inadequate coverage.
+- Benchmarks are not typically generalizable in protein engineering.  
+
+
+## Combinatorial explosion of the search space
+
+The primary issue with benchmarks for ML-guided protein engineering is the combinatorial explosion of the search space, which is also why it's such an interesting problem.  
+
+Consider the AAV dataset from the FLIP benchmark (https://github.com/J-SNACKKB/FLIP/blob/main/splits/aav/README.md).  The dataset in total has 284,009 measurements of different AAV2 capsids with variations in the 561 - 588 amino acid.  This includes deletions of some amino acids within that region.  If we don't include insertions (growing that space), then the total number of possible mutants is $20^{588 - 561} -1 = 1.34e35$.  The benchmark dataset covers on the order of $\sim 10^{-30}$ of the total search space.  If you design a new AAV2 variant using this data, then the naive probability it's contained within a potential test set from the same data is $\approx 10^{-30}$, or almost zero.  Especially if you design a mutant that's far away (in edit distance) from your training set.  
+
+The other solution to the problem is to limit it to a space small enough that the entire search space can be covered experimentally.  This limits the search space to 4, maybe 5 if you have a lot of resources, amino acids ($20^4 =$ 160,000 and $20^5 =$ 3,200,000).  This is the strategy in the FLIP GB1 benchmark dataset.  However, this problem is not nearly as interesting or difficult as longer proteins.  Methods that may work well for longer proteins may not show much of a performance boost in these small problems.  With a higher search space, there is more opportunity for epistatic interaction to escape or correct for a locally suboptimal mutation, or a more global shift in the sequence to allow for opening up or exposing different residues.  
+
+
+## Benchmarks don't necessarily generalize
+
+"How much of computer vision has been over-optimizing on the ImageNet test set?" - Trevor Hastie, as recalled by me (memory might be fallible).  I recall this question during a Statistics seminar sometime around 2016 or 2017.  
+
+In my mind, the goal of ML-guided protein engineering is to design proteins to achieve some affect within human cells (or maybe some other specie).  This importantly includes interactions with other proteins or molecules in that biological cell.  In such cases, specific methods may work better than others.  Results for one task may not generalize to another.  
+  - Will methods that perform well in optimizing AAV capsids for viability achieve the same performance in the problem of optimizing small gene activators, where the effect is largely determined by how the gene activator interacts with the target regions epigenetics and recruits transcription factors to affect changes in gene regulation?  
+  -Will methods that perform well in optimizing gene activators, where structure may not be important (e.g. https://elifesciences.org/articles/68068.pdf), also work with with designing protein-binding proteins, where structure is absolutely critical?
+  
+For drug discovery, the problem of generalization is even more complicated because the designed drug has to generalize across the drug development pipeline.  This pipeline usually consists of multiple stages of testing within different biological systems.  For example, the testing will start off in synthetic system within an immortalized cell line.  E.g. if you're testing for a drug that's supposed to work in liver cells (as most drugs do because everything ends up in the liver), then you'll probably work in HepG2 cells.  The next step is then mice, or if you have lots of funding, primates.  Final step is actual humans.  The drug needs to work (to at least some level) in order to pass through all the stages of development.  For ML methods to work well, not only must they generalize to unseen instances within the same system, but they must also generalize to multiple biological systems.  
+
+Which brings me to my next point, which is that most of these benchmarks are taken from a single experiment.  If we use these tasks as true benchmarks, how much are we overfitting to the batch effects and experiment-specific biases of the benchmarks?  
+
+# What's the solution
+
+The only solution I can see to this problem is to require real experimental testing of designed proteins.  Benchmarks can only tell us so much.  Such  methods of comparison are only proxy measurements for the true performance.  They try to substitute for the true performance, I'm not convinced they're perfectly (or even highly) correlated with the true performance.  Real experimental testing is the only way to truly get at the true performance.  But as I mentioned previously, this is still a (slightly better) proxy for the true performance, especially in drug discovery.  
+
+
+
+
