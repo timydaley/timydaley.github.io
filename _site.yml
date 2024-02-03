@@ -34,6 +34,8 @@ navbar:
       href: kmeans_gmm/gmm_vs_kmeans.html
     - text: "Lindsey's method"
       href: lindseys_method/Lindseys_method.html
+    - text: "Benchmarking Rant"
+      href: ProteinBenchmarkingRant/ProteinBenchmarkingRant.html
 output_dir: "."
 output:
   html_document:

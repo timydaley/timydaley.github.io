@@ -363,11 +363,15 @@ thinking about a particular problem in the field of protein engineering.
 The most of the reviews mentioned the problem of comparing to existing
 benchmark in the ML protein engineering space. However, it is my opinion
 that these benchmarks are practically useless in the real application of
-ML-guided protein engineering, as I will lay out here.</p>
-<p>The problems with benchmarks can be summarized into two main buckets:
-- Combinatorial explosion of the search space limits the types of
-benchmarks or results in inadequate coverage. - Benchmarks are not
-typically generalizable in protein engineering.</p>
+ML-guided protein engineering, as I will lay out here in my rant.</p>
+<p>The problems with benchmarks can be summarized into two main
+buckets:</p>
+<ul>
+<li>Combinatorial explosion of the search space limits the types of
+benchmarks or results in inadequate coverage.</li>
+<li>Benchmarks are not typically generalizable in protein
+engineering.</li>
+</ul>
 <div id="combinatorial-explosion-of-the-search-space" class="section level2">
 <h2>Combinatorial explosion of the search space</h2>
 <p>The primary issue with benchmarks for ML-guided protein engineering
@@ -408,16 +412,19 @@ proteins to achieve some affect within human cells (or maybe some other
 specie). This importantly includes interactions with other proteins or
 molecules in that biological cell. In such cases, specific methods may
 work better than others. Results for one task may not generalize to
-another.<br />
-- Will methods that perform well in optimizing AAV capsids for viability
-achieve the same performance in the problem of optimizing small gene
-activators, where the effect is largely determined by how the gene
-activator interacts with the target regions epigenetics and recruits
-transcription factors to affect changes in gene regulation?<br />
+another.</p>
+<ul>
+<li>Will methods that perform well in optimizing AAV capsids for
+viability achieve the same performance in the problem of optimizing
+small gene activators, where the effect is largely determined by how the
+gene activator interacts with the target regions epigenetics and
+recruits transcription factors to affect changes in gene
+regulation?<br />
 -Will methods that perform well in optimizing gene activators, where
 structure may not be important (e.g. <a href="https://elifesciences.org/articles/68068.pdf" class="uri">https://elifesciences.org/articles/68068.pdf</a>), also work
 with with designing protein-binding proteins, where structure is
-absolutely critical?</p>
+absolutely critical?</li>
+</ul>
 <p>For drug discovery, the problem of generalization is even more
 complicated because the designed drug has to generalize across the drug
 development pipeline. This pipeline usually consists of multiple stages
@@ -433,11 +440,11 @@ generalize to unseen instances within the same system, but they must
 also generalize to multiple biological systems.</p>
 <p>Which brings me to my next point, which is that most of these
 benchmarks are taken from a single experiment. If we use these tasks as
-true benchmarks, how much are we overfitting to the batch effects and
-experiment-specific biases of the benchmarks?</p>
+true benchmarks, how much is the field overfitting to the batch effects
+and experiment-specific biases of the benchmarks?</p>
 </div>
 <div id="whats-the-solution" class="section level1">
-<h1>What’s the solution</h1>
+<h1>What’s the solution?</h1>
 <p>The only solution I can see to this problem is to require real
 experimental testing of designed proteins. Benchmarks can only tell us
 so much. Such methods of comparison are only proxy measurements for the
