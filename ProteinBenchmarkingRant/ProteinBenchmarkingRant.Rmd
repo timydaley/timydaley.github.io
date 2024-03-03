@@ -33,7 +33,11 @@ In my mind, the goal of ML-guided protein engineering is to design proteins to a
   
 For drug discovery, the problem of generalization is even more complicated because the designed drug has to generalize across the drug development pipeline.  This pipeline usually consists of multiple stages of testing within different biological systems.  For example, the testing will start off in synthetic system within an immortalized cell line.  E.g. if you're testing for a drug that's supposed to work in liver cells (as most drugs do because everything ends up in the liver), then you'll probably work in HepG2 cells.  The next step is then mice, or if you have lots of funding, primates.  Final step is actual humans.  The drug needs to work (to at least some level) in order to pass through all the stages of development.  For ML methods to work well, not only must they generalize to unseen instances within the same system, but they must also generalize to multiple biological systems.  
 
-Which brings me to my next point, which is that most of these benchmarks are taken from a single experiment.  If we use these tasks as true benchmarks, how much is the field overfitting to the batch effects and experiment-specific biases of the benchmarks?  
+Which brings me to my next point, which is that most of these benchmarks are taken from a single experiment.  If we use these tasks as true benchmarks, how much is the field overfitting to the batch effects and experiment-specific biases of the benchmarks? 
+
+# What do protein benchmarks actually test?
+
+Protein benchmarks are really useful for model development.  They allow researchers to evaluate and test their model on a wide range of biological modalities, which allows researchers to evaluate how well their model generalizes across the protein spectrum.  However, once the model is fixed, say if you're using ESM2 embeddings, then benchmarking is not that useful for the reasons stated above. 
 
 # What's the solution?
 

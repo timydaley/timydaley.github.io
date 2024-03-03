@@ -11,7 +11,7 @@
 
 <meta name="author" content="Timothy Daley" />
 
-<meta name="date" content="2024-02-02" />
+<meta name="date" content="2024-03-02" />
 
 <title>The Problem with Benchmark Datasets for ML-Guided Protein Engineering</title>
 
@@ -353,7 +353,7 @@ display: none;
 <h1 class="title toc-ignore">The Problem with Benchmark Datasets for
 ML-Guided Protein Engineering</h1>
 <h4 class="author">Timothy Daley</h4>
-<h4 class="date">2024-02-02</h4>
+<h4 class="date">2024-03-02</h4>
 
 </div>
 
@@ -442,6 +442,15 @@ also generalize to multiple biological systems.</p>
 benchmarks are taken from a single experiment. If we use these tasks as
 true benchmarks, how much is the field overfitting to the batch effects
 and experiment-specific biases of the benchmarks?</p>
+</div>
+<div id="what-do-protein-benchmarks-actually-test" class="section level1">
+<h1>What do protein benchmarks actually test?</h1>
+<p>Protein benchmarks are really useful for model development. They
+allow researchers to evaluate and test their model on a wide range of
+biological modalities, which allows researchers to evaluate how well
+their model generalizes across the protein spectrum. However, once the
+model is fixed, say if you’re using ESM2 embeddings, then benchmarking
+is not that useful for the reasons stated above.</p>
 </div>
 <div id="whats-the-solution" class="section level1">
 <h1>What’s the solution?</h1>
