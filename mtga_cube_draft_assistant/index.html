@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="author" content="Timothy Daley" />
+<title>Building an MTGA Cube Draft Assistant</title>
+<link href="../site_libs/bootstrap-3.3.5/css/yeti.min.css" rel="stylesheet" />
+<script src="../site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<script src="../site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<style>
+.main-container { max-width: 940px; margin-left: auto; margin-right: auto; }
+body { padding-top: 60px; padding-bottom: 40px; }
+table { width: 100%; margin-bottom: 20px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+th { background: #f5f5f5; }
+pre { background: #f7f7f7; padding: 12px; border-radius: 4px; }
+.small-note { color: #666; font-size: 0.95em; }
+</style>
+</head>
+<body>
+<div class="container-fluid main-container">
+
+<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="../index.html">HOME</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li><a href="../FisherVsStouffer.html">Fisher vs Stouffer</a></li>
+        <li><a href="../you_need_a_test_set/you_need_a_test_set.html">you need a test set</a></li>
+        <li><a href="../kmeans_gmm/gmm_vs_kmeans.html">GMMs vs k-means</a></li>
+        <li><a href="../lindseys_method/Lindseys_method.html">Lindsey's method</a></li>
+        <li><a href="../mtga_cube_draft_assistant/">MTGA Cube Draft Assistant</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h1>Building an MTGA Cube Draft Assistant</h1>
+<p class="small-note">July 5, 2026</p>
+
+<p>I've been building a draft assistant for <strong>Magic: The Gathering Arena Cube</strong>. The goal is simple: given the current pack, my previous picks, the cards I've seen, and the cube list, recommend a pick.</p>
+
+<p>This post summarizes the current state of the project: the models, the offline results, the first Monte Carlo tree search experiments, and one real-pack example where several model variants make noticeably different choices.</p>
+
+<h2>The setup</h2>
+
+<p>A draft pick is represented with only information available to the drafter:</p>
+<ul>
+<li>the current pack</li>
+<li>my drafted pool</li>
+<li>cards I saw but did not pick</li>
+<li>pack number and pick number</li>
+<li>the known cube list</li>
+</ul>
+
+<p>The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Cards are represented with learned embeddings plus Scryfall-derived features. The policy scores every card in the current pack and is trained to imitate human picks.</p>
+
+<p>I also trained outcome/value components from 17lands game data: a deck-quality model, a card-bonus model, and DPO-style preference policies that shift the pick model toward game-data-preferred cards while trying not to destroy human-pick agreement.</p>
+
+<h2>Current offline results</h2>
+
+<table>
+<thead><tr><th>Model / setting</th><th>Human top-1</th><th>Human top-3</th><th>Game-data pref. acc.</th></tr></thead>
+<tbody>
+<tr><td>Human continued, no value rerank</td><td>0.6240</td><td>0.9093</td><td>0.5494</td></tr>
+<tr><td>Human continued + value rerank</td><td>0.6234</td><td>0.9077</td><td>0.6062</td></tr>
+<tr><td>Safer game-data DPO + value rerank</td><td>0.6161</td><td>0.9048</td><td>0.6406</td></tr>
+<tr><td>Aggressive game-data + value rerank</td><td>0.5092</td><td>0.8411</td><td>0.7262</td></tr>
+</tbody>
+</table>
+
+<p>The trade-off is clear: the safer game-data model keeps most of the human-pick accuracy while improving game-data preference agreement. The aggressive model optimizes game-data preferences much harder, but it no longer behaves like a human drafter and often makes suspicious-looking picks.</p>
+
+<h2>How much does previous-pick context matter?</h2>
+
+<p>A lot. I tested the human-continued model by removing or corrupting the previous-pick context on a 20k held-out sample:</p>
+
+<table>
+<thead><tr><th>Context</th><th>Top-1</th><th>Top-3</th><th>Same top pick as full context</th></tr></thead>
+<tbody>
+<tr><td>full pool + seen</td><td>0.6168</td><td>0.9070</td><td>1.0000</td></tr>
+<tr><td>no pool, keep seen</td><td>0.4268</td><td>0.7545</td><td>0.5116</td></tr>
+<tr><td>keep pool, no seen</td><td>0.6160</td><td>0.9065</td><td>0.9409</td></tr>
+<tr><td>no pool, no seen</td><td>0.4070</td><td>0.7384</td><td>0.4856</td></tr>
+<tr><td>shuffled pool</td><td>0.3507</td><td>0.6533</td><td>0.4088</td></tr>
+</tbody>
+</table>
+
+<p>The pool matters enormously. The seen-but-unpicked channel matters much less in the current model.</p>
+
+<h2>Adding inference-time search</h2>
+
+<p>The next experiment was to add <strong>Monte Carlo tree search at inference time</strong>. This is not training. The model is already trained; MCTS is a slower "think harder" button.</p>
+
+<p>For each candidate pick, the search forces that pick, samples plausible future packs from the cube, completes the draft with the policy, builds/scores the final pool with the value model, and combines rollout value with the policy prior.</p>
+
+<p>Because MTGA logs do not reveal hidden packs or opponent picks, this is an information-set approximation. It knows my pack and my pool, but future packs are sampled rather than perfectly reconstructed.</p>
+
+<table>
+<thead><tr><th>Simulations</th><th>p50</th><th>p95</th><th>Mean</th></tr></thead>
+<tbody>
+<tr><td>10</td><td>418 ms</td><td>574 ms</td><td>378 ms</td></tr>
+<tr><td>25</td><td>942 ms</td><td>1370 ms</td><td>850 ms</td></tr>
+<tr><td>50</td><td>1825 ms</td><td>2697 ms</td><td>1642 ms</td></tr>
+</tbody>
+</table>
+
+<p>So 25 simulations is a reasonable default for a live "think harder" mode.</p>
+
+<pre><code>--simulations 25
+--rank-by final
+--root-policy-weight 0.15
+--root-value-weight 1.0
+--root-value-mode prob
+--rollout-temperature 0.0
+--cpuct 1.5</code></pre>
+
+<h2>A real depleted-pack example</h2>
+
+<p>The following trace uses real packs from the held-out 17lands eval data. These are not independently sampled fake packs. They are the packs as seen by a real drafter, already depleted by previous picks. Pack sizes go from 14 down to 7.</p>
+
+<p class="small-note">Caveat: the later packs are real for the human's actual draft path. If a model makes a different earlier pick, the later packs are not a perfect counterfactual.</p>
+
+<h3>The real packs</h3>
+
+<p><strong>Pick 1, pack size 14</strong></p>
+<p>Arena of Glory; Blood Crypt; Containment Priest; Endurance; Godless Shrine; Grief; Omnath, Locus of Creation; Ouroboroid; Skyclave Apparition; Snapcaster Mage; Sundering Titan; The Wandering Emperor; Wishclaw Talisman; Yavimaya, Cradle of Growth</p>
+
+<p><strong>Pick 2, pack size 13</strong></p>
+<p>Birds of Paradise; Chain Lightning; Cosmogrand Zenith; Gitaxian Probe; Hymn to Tourach; Life // Death; Multiversal Passage; Soul-Guide Lantern; Talisman of Indulgence; Talisman of Unity; Torsten, Founder of Benalia; Wasteland; Witch Enchanter // Witch-Blessed Meadow</p>
+
+<p><strong>Pick 3, pack size 12</strong></p>
+<p>Dark Confidant; Deathrite Shaman; Demonic Tutor; Expressive Iteration; Get Lost; Liliana of the Veil; Questing Druid // Seek the Beast; Razorverge Thicket; Sylvan Caryatid; Underground Mortuary; Virtue of Loyalty // Ardenvale Fealty; Windswept Heath</p>
+
+<p><strong>Pick 4, pack size 11</strong></p>
+<p>Copperline Gorge; Elvish Reclaimer; Flickerwisp; Mine Collapse; Savai Triome; Scrubland; Talisman of Progress; Trumpeting Carnosaur; Unexpectedly Absent; Valki, God of Lies // Tibalt, Cosmic Impostor; Zuran Orb</p>
+
+<p><strong>Pick 5, pack size 10</strong></p>
+<p>Archon of Cruelty; Bleachbone Verge; Mana Confluence; Questing Beast; Sacred Foundry; Blazing Firesinger // Seething Song; Stomping Ground; Taiga; Tersa Lightshatter; Titania, Protector of Argoth</p>
+
+<p><strong>Pick 6, pack size 9</strong></p>
+<p>Crucible of Worlds; Emperor of Bones; Grim Lavamancer; Jetmir's Garden; Restless Cottage; Restless Fortress; Rofellos, Llanowar Emissary; Sanguine Evangelist; Vampire Hexmage</p>
+
+<p><strong>Pick 7, pack size 8</strong></p>
+<p>Bone Shards; Collective Brutality; Exploration; Keen-Eyed Curator; Overgrown Tomb; Restless Vents; Utopia Sprawl; Winds of Abandon</p>
+
+<p><strong>Pick 8, pack size 7</strong></p>
+<p>Celestial Colonnade; Deep-Cavern Bat; Gloomlake Verge; Jadar, Ghoulcaller of Nephalia; Prismatic Ending; Sink into Stupor // Soporific Springs; Talisman of Conviction</p>
+
+<h3>Model choices</h3>
+
+<table>
+<thead><tr><th>Pick</th><th>Human log</th><th>Human imitation</th><th>Safe game-data</th><th>Aggressive game-data</th><th>MCTS</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Skyclave Apparition</td><td>Snapcaster Mage</td><td>Skyclave Apparition</td><td>Ouroboroid</td><td>Blood Crypt</td></tr>
+<tr><td>2</td><td>Gitaxian Probe</td><td>Gitaxian Probe</td><td>Cosmogrand Zenith</td><td>Birds of Paradise</td><td>Hymn to Tourach</td></tr>
+<tr><td>3</td><td>Windswept Heath</td><td>Demonic Tutor</td><td>Windswept Heath</td><td>Demonic Tutor</td><td>Demonic Tutor</td></tr>
+<tr><td>4</td><td>Scrubland</td><td>Scrubland</td><td>Unexpectedly Absent</td><td>Zuran Orb</td><td>Valki, God of Lies // Tibalt, Cosmic Impostor</td></tr>
+<tr><td>5</td><td>Sacred Foundry</td><td>Archon of Cruelty</td><td>Sacred Foundry</td><td>Titania, Protector of Argoth</td><td>Archon of Cruelty</td></tr>
+<tr><td>6</td><td>Sanguine Evangelist</td><td>Emperor of Bones</td><td>Sanguine Evangelist</td><td>Emperor of Bones</td><td>Emperor of Bones</td></tr>
+<tr><td>7</td><td>Winds of Abandon</td><td>Collective Brutality</td><td>Winds of Abandon</td><td>Keen-Eyed Curator</td><td>Bone Shards</td></tr>
+<tr><td>8</td><td>Deep-Cavern Bat</td><td>Deep-Cavern Bat</td><td>Prismatic Ending</td><td>Deep-Cavern Bat</td><td>Deep-Cavern Bat</td></tr>
+</tbody>
+</table>
+
+<h3>Final pools</h3>
+
+<p><strong>Human log</strong>: Skyclave Apparition; Gitaxian Probe; Windswept Heath; Scrubland; Sacred Foundry; Sanguine Evangelist; Winds of Abandon; Deep-Cavern Bat</p>
+
+<p><strong>Human imitation</strong>: Snapcaster Mage; Gitaxian Probe; Demonic Tutor; Scrubland; Archon of Cruelty; Emperor of Bones; Collective Brutality; Deep-Cavern Bat</p>
+
+<p><strong>Safe game-data</strong>: Skyclave Apparition; Cosmogrand Zenith; Windswept Heath; Unexpectedly Absent; Sacred Foundry; Sanguine Evangelist; Winds of Abandon; Prismatic Ending</p>
+
+<p><strong>Aggressive game-data</strong>: Ouroboroid; Birds of Paradise; Demonic Tutor; Zuran Orb; Titania, Protector of Argoth; Emperor of Bones; Keen-Eyed Curator; Deep-Cavern Bat</p>
+
+<p><strong>MCTS value-conservative</strong>: Blood Crypt; Hymn to Tourach; Demonic Tutor; Valki, God of Lies // Tibalt, Cosmic Impostor; Archon of Cruelty; Emperor of Bones; Bone Shards; Deep-Cavern Bat</p>
+
+<h2>What happened?</h2>
+
+<p>The safe game-data model most closely follows the human's white/fixing lane. It takes Skyclave Apparition, Windswept Heath, Sacred Foundry, Sanguine Evangelist, and Winds of Abandon.</p>
+
+<p>The human-imitation model actually chases more raw power here: Snapcaster Mage, Demonic Tutor, Archon of Cruelty. That is interesting because it is the model optimized for human agreement overall, but on this trace it is less committed to the logged human's fixing-heavy path.</p>
+
+<p>The aggressive game-data model still looks unsafe. Picks like Ouroboroid, Zuran Orb, Titania, and Keen-Eyed Curator are plausible outputs of a model chasing static game-outcome bonuses, but they look contextually dubious.</p>
+
+<p>MCTS is heavily path-dependent. After taking Blood Crypt, it moves into a black/red power lane: Hymn to Tourach, Demonic Tutor, Valki/Tibalt, Archon, Emperor of Bones, Bone Shards. This may be a coherent line, but it is also a reminder that search amplifies early assumptions. If the first pick is off, the whole searched line can drift.</p>
+
+<h2>Current takeaways</h2>
+
+<ol>
+<li>The base policy is already strong at human-pick imitation.</li>
+<li>Prior picks matter a lot; removing the pool cuts top-1 accuracy by about 20 points.</li>
+<li>Safe game-data tuning improves game-data preference agreement while mostly preserving human agreement.</li>
+<li>Aggressive game-data tuning is useful for analysis, but not safe as a default recommendation policy.</li>
+<li>MCTS is promising as an inference-time "think harder" mode, especially at 25 simulations, but its disagreements need auditing.</li>
+<li>Real depleted-pack traces are much more informative than random pack examples.</li>
+</ol>
+
+<p>The next thing I want is a larger disagreement audit: sample many real draft prefixes, compare human / safe / MCTS / aggressive choices, and manually review the cases where MCTS changes the pick.</p>
+
+</div>
+</body>
+</html>
