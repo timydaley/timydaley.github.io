@@ -19,13 +19,56 @@ A draft pick is represented with only information available to the drafter:
 - pack number and pick number
 - the known cube list
 
-The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Cards are represented with learned embeddings plus Scryfall-derived features. The policy scores every card in the current pack and is trained to imitate human picks.
+The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Each card gets a learned identity embedding, but that is not the whole representation. I add a second feature-derived embedding computed from Scryfall metadata: mana value, color and color-identity bits, card-type bits, rarity, power/toughness fields, keyword indicators, and oracle-text features. In model terms, the representation is roughly
+
+```text
+card_repr = learned_card_embedding + alpha * MLP(scryfall_features)
+```
+
+where `alpha` starts high and is annealed to a nonzero floor. This lets common cube cards specialize through their learned embeddings while still giving reasonable representations to changed or unseen cube cards from their rules text and metadata. The policy scores every card in the current pack and is trained to imitate human picks.
 
 I also trained outcome/value components from 17lands game data:
 
 1. a deck-quality model that predicts game win probability from a built deck,
 2. a card-bonus model that estimates which maindeck cards correlate with winning,
 3. DPO-style preference policies that shift the pick model toward game-data-preferred cards while trying not to destroy human-pick agreement.
+
+## Model and training details
+
+The pick model is a cube-context contextual preference ranker. For a cube with `C` cards, every training example has a `C`-dimensional current-pack mask, pool count vector, seen-but-unpicked count vector, and cube mask. The model first computes `card_repr` for every card in the cube. It then uses separate DeepSets encoders for three unordered sets:
+
+```text
+pool_repr = DeepSet(cards in my pool)
+seen_repr = DeepSet(cards I saw but passed)
+cube_repr = DeepSet(cards in the cube list)
+```
+
+The draft context is the concatenation of those three set embeddings, an explicit WUBRG color-commitment vector from the pool, and learned embeddings for pack number and pick number. A small MLP maps that context to the same dimension as a card representation. Each card is scored by a dot product plus a card bias:
+
+```text
+context = MLP(pool_repr, seen_repr, cube_repr, color_commit, pack_idx, pick_idx)
+score(card | context) = dot(context, card_repr(card)) + bias(card)
+```
+
+The policy is trained over the in-pack support only. The main loss is a contextual preference / triplet ranking loss: the logged human pick should score at least a margin above every other card in the pack.
+
+```text
+loss = mean_over_unpicked_cards max(0, margin - score(picked) + score(unpicked))
+```
+
+In the current implementation the representation dimension is 128, the hidden dimension is 256, and the default margin is 0.2. The Scryfall feature contribution `alpha` anneals from 1.0 to a floor of 0.3 over early training. I also use random cube-list masking during training so the model is robust to partial or changing Arena Cube lists.
+
+The outcome model is separate. It takes a built deck and sideboard, encodes maindeck and sideboard cards with DeepSets over the same card representation, concatenates rank/event/color covariates, and predicts game win probability. I train this on 17lands game data, both per-game and aggregated by `(draft_id, build_index)`. For deployment, a simple heuristic deckbuilder maps a draft pool to a 40-card deck before scoring.
+
+The game-card bonus model is an even simpler outcome model:
+
+```text
+logit(win_probability) = intercept + sum(card_in_maindeck * card_bonus) + covariates
+```
+
+I tested pair-interaction variants, but they overfit relative to the card-only model. The learned top bonuses were plausible Powered Cube cards: Ancestral Recall, Time Walk, Black Lotus, Sol Ring, Mana Crypt, and the Moxen.
+
+Finally, I generated static preference pairs for DPO. For a logged pick state, if one in-pack candidate has a sufficiently higher learned game-card bonus than another, that pair becomes `(preferred, rejected)`. DPO fine-tunes the pick policy toward those game-data preferences while anchoring it to the human-pick reference policy with a KL penalty. This gives the safe/aggressive trade-off in the table below.
 
 ## Current offline results
 
