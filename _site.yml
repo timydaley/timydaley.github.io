@@ -2,40 +2,8 @@ name: "A collection of poorly-executed thoughts and essays"
 navbar:
   title: "HOME"
   left:
-    - text: "Fisher vs Stouffer"
-      href: FisherVsStouffer.html
-    - text: "2 groups"
-      href: twoGroupsBackground.html
-    - text: "empirical FDR"
-      href: empiricalFDR.html
-    - text: "Good-Turing vs Laplace"
-      href: CRISPR_qc/logNormalPoissonGoodTuring.html
-    - text: "signal to noise ratio in screens"
-      href: CRISPR_qc/CorrelationBreakdown.html
-    - text: "What's a test set?"
-      href: crispr_tko/tree_model/tree_model.html
-    - text: "intro CRISPR screens"
-      href: IntroToCRISPRiaScreenAnalysis/Intro2CRISPRScreenAnalysis.html
-    - text: "Bioinformatics Engineer Exam"
-      href: EpicBlog/EngineeringInterviewBlogPost.html
-    - text: "Gini Bias"
-      href: gini.html
-    - text: "Intro Tree-Based ML Models"
-      href: presentations/AnIntroductiontoTree-basedMLmodels.pdf
-    - text: "Intro Mixture Models"
-      href: presentations/AnIntroductionToMixtureModelsAndTheirApplicationInBiologicalSciences.pdf
-    - text: "LLM embeddings in SSM"
-      href: ssm/ssm_embed.html
-    - text: "Learning Man LLM"
-      href: presentations/LearningMan_LargeLanguageModels.pdf
-    - text: "you need a test set"
-      href: you_need_a_test_set/you_need_a_test_set.html
-    - text: "GMMs vs k-means"
-      href: kmeans_gmm/gmm_vs_kmeans.html
-    - text: "Lindsey's method"
-      href: lindseys_method/Lindseys_method.html
-    - text: "MTGA Cube Draft Assistant"
-      href: mtga_cube_draft_assistant/
+    - text: "Posts"
+      href: posts/
 output_dir: "."
 output:
   html_document:
