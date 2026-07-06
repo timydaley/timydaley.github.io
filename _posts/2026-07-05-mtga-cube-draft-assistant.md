@@ -19,7 +19,7 @@ A draft pick is represented with only information available to the drafter:
 - pack number and pick number
 - the known cube list
 
-The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Each card gets a learned identity embedding, but that is not the whole representation. I add a second feature-derived embedding computed from Scryfall metadata: mana value, color and color-identity bits, card-type bits, rarity, power/toughness fields, keyword indicators, and oracle-text features. In model terms, the representation is roughly
+The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Each card is represented by combining a card-specific learned vector with features extracted from Scryfall metadata and rules text: mana value, color and color-identity bits, card-type bits, rarity, power/toughness fields, keyword indicators, and oracle-text features. In model terms, the representation is roughly
 
 ```text
 card_repr = learned_card_embedding + alpha * MLP(scryfall_features)
