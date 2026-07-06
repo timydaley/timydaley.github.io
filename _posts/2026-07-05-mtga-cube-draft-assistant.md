@@ -220,7 +220,9 @@ The human-imitation model actually chases more raw power here: Snapcaster Mage, 
 
 The aggressive game-data model still looks unsafe. Picks like Ouroboroid, Zuran Orb, Titania, and Keen-Eyed Curator are plausible outputs of a model chasing static game-outcome bonuses, but they look contextually dubious.
 
-MCTS is heavily path-dependent. After taking Blood Crypt, it moves into a black/red power lane: Hymn to Tourach, Demonic Tutor, Valki/Tibalt, Archon, Emperor of Bones, Bone Shards. This may be a coherent line, but it is also a reminder that search amplifies early assumptions. If the first pick is off, the whole searched line can drift.
+The most interesting part of the real-pack example is that MCTS appears to choose a lane and strategy early. After taking Blood Crypt, it moves into a black/red, maybe Rakdos-reanimator-ish, power lane: Hymn to Tourach, Demonic Tutor, Valki/Tibalt, Archon of Cruelty, Emperor of Bones, Bone Shards. Whether or not Blood Crypt is the best first pick, the later MCTS picks are at least coherent with that early commitment.
+
+The other models look less strategically consistent in this trace. Human imitation takes individually strong cards, but jumps between Snapcaster, Demonic Tutor, Scrubland, Archon, black interaction, and Deep-Cavern Bat without as clear a deck plan. Safe game-data follows the logged human's white/fixing lane more closely, but sometimes takes value/removal cards over synergy. Aggressive game-data mixes value and combo-looking cards and produces the least coherent path. This is a useful qualitative difference: search can amplify a questionable early lane choice, but it can also make the subsequent picks more internally consistent.
 
 ## Current takeaways
 
@@ -228,7 +230,7 @@ MCTS is heavily path-dependent. After taking Blood Crypt, it moves into a black/
 2. Prior picks matter a lot; removing the pool cuts top-1 accuracy by about 20 points.
 3. Safe game-data tuning improves game-data preference agreement while mostly preserving human agreement.
 4. Aggressive game-data tuning is useful for analysis, but not safe as a default recommendation policy.
-5. MCTS is promising as an inference-time search/reranking method, especially at 25 simulations, but its disagreements need auditing.
+5. MCTS is promising as an inference-time search/reranking method because it often commits to a lane and then chooses strong cards for that lane. Its disagreements still need auditing, especially when the initial lane choice is questionable.
 6. Real depleted-pack traces are much more informative than random pack examples.
 
 The next thing I want is a larger disagreement audit: sample many real draft prefixes, compare human / safe / MCTS / aggressive choices, and manually review the cases where MCTS changes the pick.
