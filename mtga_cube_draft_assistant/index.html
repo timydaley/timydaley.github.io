@@ -142,7 +142,7 @@ score(card | context) = dot(context, card_repr(card)) + bias(card)</code></pre>
 
 <h2>Adding inference-time search</h2>
 
-<p>The next experiment was to add <strong>Monte Carlo tree search at inference time</strong>. This is not training. The model is already trained; MCTS is a slower "think harder" button.</p>
+<p>The next experiment was to add <strong>Monte Carlo tree search at inference time</strong>. This is not training. The model is already trained; MCTS is a search procedure that evaluates each legal pick by simulating possible continuations of the draft and scoring the resulting pools.</p>
 
 <p>For each candidate pick, the search forces that pick, samples plausible future packs from the cube, completes the draft with the policy, builds/scores the final pool with the value model, and combines rollout value with the policy prior.</p>
 
@@ -157,7 +157,7 @@ score(card | context) = dot(context, card_repr(card)) + bias(card)</code></pre>
 </tbody>
 </table>
 
-<p>So 25 simulations is a reasonable default for a live "think harder" mode.</p>
+<p>So 25 simulations is a reasonable default for live search-based reranking.</p>
 
 <pre><code>--simulations 25
 --rank-by final
@@ -244,7 +244,7 @@ score(card | context) = dot(context, card_repr(card)) + bias(card)</code></pre>
 <li>Prior picks matter a lot; removing the pool cuts top-1 accuracy by about 20 points.</li>
 <li>Safe game-data tuning improves game-data preference agreement while mostly preserving human agreement.</li>
 <li>Aggressive game-data tuning is useful for analysis, but not safe as a default recommendation policy.</li>
-<li>MCTS is promising as an inference-time "think harder" mode, especially at 25 simulations, but its disagreements need auditing.</li>
+<li>MCTS is promising as an inference-time search/reranking method, especially at 25 simulations, but its disagreements need auditing.</li>
 <li>Real depleted-pack traces are much more informative than random pack examples.</li>
 </ol>
 

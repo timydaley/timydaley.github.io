@@ -27,7 +27,7 @@ card_repr = learned_card_embedding + alpha * MLP(scryfall_features)
 
 where `alpha` starts high and is annealed to a nonzero floor. This lets common cube cards specialize through their learned embeddings while still giving reasonable representations to changed or unseen cube cards from their rules text and metadata. The policy scores every card in the current pack and is trained to imitate human picks.
 
-There are several model variants in the post, and the names mean different things:
+Models trained:
 
 1. **Human imitation / human continued** is the pick policy trained only to match logged 17lands human picks. This is the most human-like baseline.
 2. **Deck-quality model** is a separate value model trained from 17lands game results. It takes a completed 40-card deck plus sideboard and metadata, then predicts game win probability. I use it to ask: "if this draft pool became this deck, how good would the deck be?"
@@ -85,7 +85,7 @@ On a held-out Powered Cube split, the strongest human-imitation model gets rough
 | Safer game-data DPO + value rerank | 0.6161 | 0.9048 | 0.6406 |
 | Aggressive game-data + value rerank | 0.5092 | 0.8411 | 0.7262 |
 
-The trade-off is clear: the safer game-data model keeps most of the human-pick accuracy while improving game-data preference agreement. The aggressive model optimizes game-data preferences much harder, but it no longer behaves like a human drafter and often makes suspicious-looking picks.
+It seems that the safer game-data model keeps most of the human-pick accuracy while improving game-data preference agreement. The aggressive model optimizes game-data preferences much harder, but it no longer behaves like a human drafter and often makes suspicious picks.
 
 ## How much does previous-pick context matter?
 
@@ -103,7 +103,7 @@ The pool matters enormously. The seen-but-unpicked channel matters much less in 
 
 ## Adding inference-time search
 
-The next experiment was to add **Monte Carlo tree search at inference time**. This is not training. The model is already trained; MCTS is a slower "think harder" button.
+The next experiment was to add **Monte Carlo tree search at inference time**. This is not training. The model is already trained; MCTS is a search procedure that evaluates each legal pick by simulating possible continuations of the draft and scoring the resulting pools.
 
 For each candidate pick, the search:
 
@@ -123,7 +123,7 @@ Latency with the model loaded once, on CPU, using real 17lands pick states:
 | 25 | 942 ms | 1370 ms | 850 ms |
 | 50 | 1825 ms | 2697 ms | 1642 ms |
 
-So 25 simulations is a reasonable default for a live "think harder" mode.
+So 25 simulations is a reasonable default for live search-based reranking.
 
 The current MCTS default is:
 
@@ -228,7 +228,7 @@ MCTS is heavily path-dependent. After taking Blood Crypt, it moves into a black/
 2. Prior picks matter a lot; removing the pool cuts top-1 accuracy by about 20 points.
 3. Safe game-data tuning improves game-data preference agreement while mostly preserving human agreement.
 4. Aggressive game-data tuning is useful for analysis, but not safe as a default recommendation policy.
-5. MCTS is promising as an inference-time "think harder" mode, especially at 25 simulations, but its disagreements need auditing.
+5. MCTS is promising as an inference-time search/reranking method, especially at 25 simulations, but its disagreements need auditing.
 6. Real depleted-pack traces are much more informative than random pack examples.
 
 The next thing I want is a larger disagreement audit: sample many real draft prefixes, compare human / safe / MCTS / aggressive choices, and manually review the cases where MCTS changes the pick.
