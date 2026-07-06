@@ -27,11 +27,15 @@ card_repr = learned_card_embedding + alpha * MLP(scryfall_features)
 
 where `alpha` starts high and is annealed to a nonzero floor. This lets common cube cards specialize through their learned embeddings while still giving reasonable representations to changed or unseen cube cards from their rules text and metadata. The policy scores every card in the current pack and is trained to imitate human picks.
 
-I also trained outcome/value components from 17lands game data:
+There are several model variants in the post, and the names mean different things:
 
-1. a deck-quality model that predicts game win probability from a built deck,
-2. a card-bonus model that estimates which maindeck cards correlate with winning,
-3. DPO-style preference policies that shift the pick model toward game-data-preferred cards while trying not to destroy human-pick agreement.
+1. **Human imitation / human continued** is the pick policy trained only to match logged 17lands human picks. This is the most human-like baseline.
+2. **Deck-quality model** is a separate value model trained from 17lands game results. It takes a completed 40-card deck plus sideboard and metadata, then predicts game win probability. I use it to ask: "if this draft pool became this deck, how good would the deck be?"
+3. **Value reranking** means taking the human pick policy's score for each card in the pack, then adding a small bonus from the deck-quality model after hypothetically adding that card to the pool.
+4. **Card-bonus model** is a simpler outcome model trained from game results. Instead of evaluating full deck structure, it learns a per-card win-rate bonus: cards that often appear in winning maindecks get positive bonuses, cards that underperform get lower bonuses. This is useful, but less contextual than the deck-quality model.
+5. **Safe game-data** is a DPO fine-tune that nudges the pick policy toward card-bonus-preferred picks while staying close to the human-imitation model.
+6. **Aggressive game-data** is a stronger DPO fine-tune that optimizes the card-bonus preferences harder. It improves game-data preference accuracy, but loses a lot of human-pick agreement and sometimes makes weird-looking picks.
+7. **MCTS value-conservative** is not a separately trained model. It is inference-time search using the value-conservative policy as a prior and the deck-quality/value model to score simulated draft continuations.
 
 ## Model and training details
 
