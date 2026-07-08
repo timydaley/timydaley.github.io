@@ -9,6 +9,8 @@ I've been building a draft assistant for **Magic: The Gathering Arena Cube**. Th
 
 This post summarizes the current state of the project: the models, the offline results, the first Monte Carlo tree search experiments, and one real-pack example where several model variants make noticeably different choices.
 
+A more paper-style writeup is also available here: [Policy--Value Learning for Magic: The Gathering Arena Cube Draft](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf).
+
 ## The setup
 
 A draft pick is represented with only information available to the drafter:
