@@ -5,9 +5,13 @@ date: 2026-07-05
 categories: magic machine-learning drafting
 ---
 
-I've been building a draft assistant for **Magic: The Gathering Arena Cube**. The goal is simple: given the current pack, my previous picks, the cards I've seen, and the cube list, recommend a pick.
 
-This post summarizes the current state of the project: the models, the offline results, the first Monte Carlo tree search experiments, and one real-pack example where several model variants make noticeably different choices.
+I've built a draft assistant for MTGA Powered Cube draft.  This is difficult because we have to balance several aspects:
+1. The power and win rate of each card individually.
+2. How does each card work with other cards I have previously taken.
+3. Based on the distribution of cards that we are seeing and what we've seen taken (after a pack goes all the way around) what are the open colors, strategies, and lanes.
+
+This post summarizes the current state of the project: the models, the offline results, the first Monte Carlo tree search experiments, a walk-through of a pack experiment, as well as a live example. 
 
 A more paper-style writeup is also available here: [Policy--Value Learning for Magic: The Gathering Arena Cube Draft](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf).
 
@@ -16,18 +20,20 @@ A more paper-style writeup is also available here: [Policy--Value Learning for M
 A draft pick is represented with only information available to the drafter:
 
 - the current pack
-- my drafted pool
-- cards I saw but did not pick
+- my previously drafted pool
+- cards I have seen but did not pick
 - pack number and pick number
 - the known cube list
 
-The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Each card is represented by combining a card-specific learned vector with features extracted from Scryfall metadata and rules text: mana value, color and color-identity bits, card-type bits, rarity, power/toughness fields, keyword indicators, and oracle-text features. In model terms, the representation is roughly
+The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Each card is represented by combining a card-specific learned vector with features extracted from Scryfall metadata and rules text: mana value, color and color-identity bits, card-type bits, rarity, power/toughness fields, keyword indicators, and oracle-text features. In model terms, the representation is 
 
 ```text
 card_repr = learned_card_embedding + alpha * MLP(scryfall_features)
 ```
 
 where `alpha` starts high and is annealed to a nonzero floor. This lets common cube cards specialize through their learned embeddings while still giving reasonable representations to changed or unseen cube cards from their rules text and metadata. The policy scores every card in the current pack and is trained to imitate human picks.
+
+There is one extra practical problem for live Arena Cube: the cube list changes, and some cards in a new live list were not present in the 17lands training/scoring vocabulary. To account for this and prevent a failure mode of an unknown card breaking the tool, I added a function-aware k-NN fallback for those cards. Instead of mapping every missing card to one generic `UNK` vector, the assistant builds a pseudo-embedding from similar known cube cards. Similarity combines structured Scryfall features, face-balanced rules text with card names removed, and curated role tags like removal, protection, tutors, rituals, fixing, artifact synergies, and graveyard synergies. This lets a new protection creature borrow from cards like Mother of Runes or Giver of Runes, while a new burn spell borrows from cards like Lightning Bolt or Abrade.
 
 Models trained:
 
@@ -63,6 +69,8 @@ loss = mean_over_unpicked_cards max(0, margin - score(picked) + score(unpicked))
 ```
 
 In the current implementation the representation dimension is 128, the hidden dimension is 256, and the default margin is 0.2. The Scryfall feature contribution `alpha` anneals from 1.0 to a floor of 0.3 over early training. I also use random cube-list masking during training so the model is robust to partial or changing Arena Cube lists.
+
+For missing live-cube cards, the k-NN fallback precomputes top neighbors against the trained scoring vocabulary and caches the weighted average. On the Arena Powered Cube 5.0 list, 117 of 540 cards were missing from the current scoring vocabulary, and all were resolved through Arena/Scryfall lookup. In synthetic leave-20-cards-out tests over 20k held-out pick states and 200 trials, overall degradation was small because only a minority of states are affected: top-1 -0.0068, top-3 -0.0036, and MRR -0.0049. On the directly affected states where the picked card was held out, the drops were larger: top-1 -0.1253, top-3 -0.0714, and MRR -0.0902. So k-NN is a useful live fallback, not a substitute for training on those cards once data exists.
 
 The outcome model is separate. It takes a built deck and sideboard, encodes maindeck and sideboard cards with DeepSets over the same card representation, concatenates rank/event/color covariates, and predicts game win probability. I train this on 17lands game data, both per-game and aggregated by `(draft_id, build_index)`. For deployment, a simple heuristic deckbuilder maps a draft pool to a 40-card deck before scoring.
 
@@ -224,7 +232,7 @@ The aggressive game-data model still looks unsafe. Picks like Ouroboroid, Zuran 
 
 The most interesting part of the real-pack example is that MCTS appears to choose a lane and strategy early. After taking Blood Crypt, it moves into a black/red, maybe Rakdos-reanimator-ish, power lane: Hymn to Tourach, Demonic Tutor, Valki/Tibalt, Archon of Cruelty, Emperor of Bones, Bone Shards. Whether or not Blood Crypt is the best first pick, the later MCTS picks are at least coherent with that early commitment.
 
-The other models look less strategically consistent in this trace. Human imitation takes individually strong cards, but jumps between Snapcaster, Demonic Tutor, Scrubland, Archon, black interaction, and Deep-Cavern Bat without as clear a deck plan. Safe game-data follows the logged human's white/fixing lane more closely, but sometimes takes value/removal cards over synergy. Aggressive game-data mixes value and combo-looking cards and produces the least coherent path. This is a useful qualitative difference: search can amplify a questionable early lane choice, but it can also make the subsequent picks more internally consistent.
+The other models look less strategically consistent in this trace. Human imitation takes individually strong cards, but jumps between Snapcaster, Demonic Tutor, Scrubland, Archon, black interaction, and Deep-Cavern Bat without as clear a deck plan. Safe game-data follows the logged human's white/fixing lane more closely, but sometimes takes value/removal cards over synergy. Aggressive game-data mixes value and combo cards and produces the least coherent path. This suggest that search can amplify a questionable early lane choice, but it can also make the subsequent picks more internally consistent.
 
 ## Current takeaways
 
@@ -234,5 +242,17 @@ The other models look less strategically consistent in this trace. Human imitati
 4. Aggressive game-data tuning is useful for analysis, but not safe as a default recommendation policy.
 5. MCTS is promising as an inference-time search/reranking method because it often commits to a lane and then chooses strong cards for that lane. Its disagreements still need auditing, especially when the initial lane choice is questionable.
 6. Real depleted-pack traces are much more informative than random pack examples.
+7. Function-aware k-NN makes live cube updates usable when cards are missing from the training data, but those cards should still be folded into future training data when possible.
 
-The next thing I want is a larger disagreement audit: sample many real draft prefixes, compare human / safe / MCTS / aggressive choices, and manually review the cases where MCTS changes the pick.
+
+## Example from a live draft
+
+
+![P1P1](/mtga_cube_draft_assistant/pack1_pick1.png)
+
+Pack 1, pick 1 shows all strategies rank Sol Ring the highest, because well it is the stringest card by far.  Next is Animate Dead, which is a strong card for the reanimate archetype.
+
+![P3P1](/mtga_cube_draft_assistant/pack3_pick1.png)
+
+At pack 3, pick 1 we've taken a bit of a controlling artifacts deck.  In which Staff of the Storyteller or Tezzeret would fit nicely into.  But Ugin is very strong, providing removal, ramp, and card draw in a single car, and we have a good amount of acceleration and colorless artifacts that he might work well.
+
