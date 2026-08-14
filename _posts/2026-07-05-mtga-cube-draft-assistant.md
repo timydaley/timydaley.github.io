@@ -248,11 +248,16 @@ The other models look less strategically consistent in this trace. Human imitati
 ## Example from a live draft
 
 
-![P1P1](/mtga_cube_draft_assistant/pack1_pick1.png)
+![P1P1](/Users/timothydaley/personal_projects/timydaley.github.io/_posts/pack1_pick1.png)
 
 Pack 1, pick 1 shows all strategies rank Sol Ring the highest, because well it is the stringest card by far.  Next is Animate Dead, which is a strong card for the reanimate archetype.
 
-![P3P1](/mtga_cube_draft_assistant/pack3_pick1.png)
+![P3P1](/Users/timothydaley/personal_projects/timydaley.github.io/_posts/pack3_pick1.png)
 
 At pack 3, pick 1 we've taken a bit of a controlling artifacts deck.  In which Staff of the Storyteller or Tezzeret would fit nicely into.  But Ugin is very strong, providing removal, ramp, and card draw in a single car, and we have a good amount of acceleration and colorless artifacts that he might work well.
 
+The deck ultimately ended up fine, not fantastic.  Went 2-2.  2nd loss was due to 
+my misplay (forgot to crew bankbuster and kill Kaito when I had the chance). 
+Both wins were with playing Ugin (once the opponent scooped immediately and 
+the other time I exiled their remaining board the next turn.  But was the deck capable
+of 7 wins?  Doubtful.
