@@ -260,4 +260,5 @@ The deck ultimately ended up fine, not fantastic.  Went 2-2.  2nd loss was due t
 my misplay (forgot to crew bankbuster and kill Kaito when I had the chance). 
 Both wins were with playing Ugin (once the opponent scooped immediately and 
 the other time I exiled their remaining board the next turn.  But was the deck capable
-of 7 wins?  Doubtful.
+of 7 wins?  Doubtful.  Was it interesting?  Very.  I hope to get more runs and data 
+from the next round of cube draft.
