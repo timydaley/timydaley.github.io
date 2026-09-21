@@ -2,263 +2,148 @@
 layout: post
 title: "Building an MTGA Cube Draft Assistant"
 date: 2026-07-05
+last_modified_at: 2026-09-20
+description: "What Flash, reanimation targets, and a disappointing draft taught me about evaluating an Arena Powered Cube assistant."
 categories: magic machine-learning drafting
 ---
 
+*Rewritten September 20, 2026, after auditing the models and evaluation.*
 
-I've built a draft assistant for MTGA Powered Cube draft.  This is difficult because we have to balance several aspects:
-1. The power and win rate of each card individually.
-2. How does each card work with other cards I have previously taken.
-3. Based on the distribution of cards that we are seeing and what we've seen taken (after a pack goes all the way around) what are the open colors, strategies, and lanes.
+You have Worldspine Wurm in your pool. The next pack offers Flash, Counterspell, and Preordain.
 
-This post summarizes the current state of the project: the models, the offline results, the first Monte Carlo tree search experiments, a walk-through of a pack experiment, as well as a live example. 
+Counterspell and Preordain are easy cards to like. Flash needs a reason. With the Wurm, you have one: put it onto the battlefield, decline to pay the extra mana, and sacrifice it. Its death trigger leaves three 5/5 tramplers. That should change how you look at this pack.
 
-A more paper-style writeup is also available here: [Policy--Value Learning for Magic: The Gathering Arena Cube Draft](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf).
+I built an assistant to help with exactly these decisions in MTG Arena Powered Cube. I’ve been unhappy with its recommendations in actual play. The offline numbers looked more encouraging than the decks, and combo picks were a particular frustration.
 
-## The setup
+So I went back through the system and its evaluation. In a small test built around that Flash pack, adding Worldspine Wurm actually moved Flash’s score in the wrong direction relative to Counterspell. The assistant had access to the pool. It still failed the interaction I wanted it to recognize.
 
-A draft pick is represented with only information available to the drafter:
+That result is a useful place to start explaining what I’ve built, what went wrong, and what I want the next version to do.
 
-- the current pack
-- my previously drafted pool
-- cards I have seen but did not pick
-- pack number and pick number
-- the known cube list
+## Start with the deck you’re trying to build
 
-The base model is a contextual pick policy trained from public 17lands Powered Cube draft logs. Each card is represented by combining a card-specific learned vector with features extracted from Scryfall metadata and rules text: mana value, color and color-identity bits, card-type bits, rarity, power/toughness fields, keyword indicators, and oracle-text features. In model terms, the representation is 
+Arena Powered Cube rewards cards that do something outrageous together. It also rewards being able to cast your spells and having a turn-two play.
 
-```text
-card_repr = learned_card_embedding + alpha * MLP(scryfall_features)
-```
+The [official Arena Powered Cube guide](https://magic.wizards.com/en/news/mtg-arena/arena-powered-cube-draft) covers both ends: individually powerful cards, combinations such as Underworld Breach with Brain Freeze and Lion’s Eye Diamond, and decks that mix several plans. That’s the balance I want the assistant to understand.
 
-where `alpha` starts high and is annealed to a nonzero floor. This lets common cube cards specialize through their learned embeddings while still giving reasonable representations to changed or unseen cube cards from their rules text and metadata. The policy scores every card in the current pack and is trained to imitate human picks.
+Suppose you already have Entomb and Archon of Cruelty. Reanimate fills a very specific hole. Another enormous creature might be useful, but it doesn’t solve the same problem. If you already have several ways to bring creatures back and nothing worth returning, that decision changes.
 
-There is one extra practical problem for live Arena Cube: the cube list changes, and some cards in a new live list were not present in the 17lands training/scoring vocabulary. To account for this and prevent a failure mode of an unknown card breaking the tool, I added a function-aware k-NN fallback for those cards. Instead of mapping every missing card to one generic `UNK` vector, the assistant builds a pseudo-embedding from similar known cube cards. Similarity combines structured Scryfall features, face-balanced rules text with card names removed, and curated role tags like removal, protection, tutors, rituals, fixing, artifact synergies, and graveyard synergies. This lets a new protection creature borrow from cards like Mother of Runes or Giver of Runes, while a new burn spell borrows from cards like Lightning Bolt or Abrade.
+The same reasoning applies to less spectacular picks. A deck full of expensive threats may need cheap interaction. A multicolor pool may need fixing before another splash card. Recognizing a combo should help the assistant see those tradeoffs, including when pursuing the combo costs too much.
 
-Models trained:
+Older Arena Cube strategy writing makes this concrete by asking what each card contributes to your plan. [MTG Arena Zone’s general strategy guide](https://mtgazone.com/arena-cube-draft-a-general-in-depth-strategy-guide/) works through examples involving aggressive decks, expensive threats, and removal. Its card recommendations belong to an older cube, but that habit of explaining a pick through the deck is useful here.
 
-1. **Human imitation / human continued** is the pick policy trained only to match logged 17lands human picks. This is the most human-like baseline.
-2. **Deck-quality model** is a separate value model trained from 17lands game results. It takes a completed 40-card deck plus sideboard and metadata, then predicts game win probability. I use it to ask: "if this draft pool became this deck, how good would the deck be?"
-3. **Value reranking** means taking the human pick policy's score for each card in the pack, then adding a small bonus from the deck-quality model after hypothetically adding that card to the pool.
-4. **Card-bonus model** is a simpler outcome model trained from game results. Instead of evaluating full deck structure, it learns a per-card win-rate bonus: cards that often appear in winning maindecks get positive bonuses, cards that underperform get lower bonuses. This is useful, but less contextual than the deck-quality model.
-5. **Safe game-data** is a DPO fine-tune that nudges the pick policy toward card-bonus-preferred picks while staying close to the human-imitation model.
-6. **Aggressive game-data** is a stronger DPO fine-tune that optimizes the card-bonus preferences harder. It improves game-data preference accuracy, but loses a lot of human-pick agreement and sometimes makes weird-looking picks.
-7. **MCTS value-conservative** is not a separately trained model. It is inference-time search using the value-conservative policy as a prior and the deck-quality/value model to score simulated draft continuations.
+## What the assistant actually sees
 
-## Model and training details
+The assistant reads the current pack, my drafted cards, cards I’ve seen and passed, the pick number, and the configured cube list. It starts with a model trained to imitate choices in public 17Lands draft logs. Previous picks already influence its scores.
 
-The pick model is a cube-context contextual preference ranker. For a cube with `C` cards, every training example has a `C`-dimensional current-pack mask, pool count vector, seen-but-unpicked count vector, and cube mask. The model first computes `card_repr` for every card in the cube. It then uses separate DeepSets encoders for three unordered sets:
+I then experimented with learning from game results. One model estimates the strength of a completed deck. Another learns a bonus for each card from the decks it appears in. I used those bonuses to generate preferred picks and train the assistant to follow them more closely.
 
-```text
-pool_repr = DeepSet(cards in my pool)
-seen_repr = DeepSet(cards I saw but passed)
-cube_repr = DeepSet(cards in the cube list)
-```
+There’s a catch: the card-only bonus doesn’t change when the pool changes. The pick model can see Entomb and Archon, while its training target keeps rewarding the same ordering of cards. A model with contextual inputs can still be pushed toward a largely fixed pick order.
 
-The draft context is the concatenation of those three set embeddings, an explicit WUBRG color-commitment vector from the pool, and learned embeddings for pack number and pick number. A small MLP maps that context to the same dimension as a card representation. Each card is scored by a dot product plus a card bias:
+The completed-deck model had a different problem. During drafting, a simple deckbuilder filled an incomplete pool with basic lands before evaluating it. Early in pack one, that can mean judging one spell and 39 basics. A model trained on finished decks has little reason to give useful advice about that input.
 
-```text
-context = MLP(pool_repr, seen_repr, cube_repr, color_commit, pack_idx, pick_idx)
-score(card | context) = dot(context, card_repr(card)) + bias(card)
-```
+New cards also need special handling as the cube changes. The assistant can borrow representations from similar known cards, using metadata, rules text, and role tags. That helps it produce recommendations for unfamiliar cards; it doesn’t establish that it understands their combos. My original writeup also overstated the main pick model’s use of rules text. That text is part of the fallback, while the main model uses learned card representations and structured attributes.
 
-The policy is trained over the in-pack support only. The main loss is a contextual preference / triplet ranking loss: the logged human pick should score at least a margin above every other card in the pack.
+## Put the same pack in two different pools
 
-```text
-loss = mean_over_unpicked_cards max(0, margin - score(picked) + score(unpicked))
-```
+Before training another version, I wanted an evaluation that exposed these problems directly.
 
-In the current implementation the representation dimension is 128, the hidden dimension is 256, and the default margin is 0.2. The Scryfall feature contribution `alpha` anneals from 1.0 to a floor of 0.3 over early training. I also use random cube-list masking during training so the model is robust to partial or changing Arena Cube lists.
+I assembled a queue of 150 cases tied to a saved 540-card cube list: 126 logged decisions and 24 deliberately constructed situations. The development portion contains 82 logged picks and nine pairs of constructed situations. Fifty cases remain reserved and unevaluated.
 
-For missing live-cube cards, the k-NN fallback precomputes top neighbors against the trained scoring vocabulary and caches the weighted average. On the Arena Powered Cube 5.0 list, 117 of 540 cards were missing from the current scoring vocabulary, and all were resolved through Arena/Scryfall lookup. In synthetic leave-20-cards-out tests over 20k held-out pick states and 200 trials, overall degradation was small because only a minority of states are affected: top-1 -0.0068, top-3 -0.0036, and MRR -0.0049. On the directly affected states where the picked card was held out, the drops were larger: top-1 -0.1253, top-3 -0.0714, and MRR -0.0902. So k-NN is a useful live fallback, not a substitute for training on those cards once data exists.
+For each pair, the pack stays fixed and one card in the pool changes. Then I check whether the focal card gains or loses ground against a specified alternative. This tests a narrower question than “did it make the best pick?” It asks whether a relevant change in the pool moved its judgment in the proposed direction.
 
-The outcome model is separate. It takes a built deck and sideboard, encodes maindeck and sideboard cards with DeepSets over the same card representation, concatenates rank/event/color covariates, and predicts game win probability. I train this on 17lands game data, both per-game and aggregated by `(draft_id, build_index)`. For deployment, a simple heuristic deckbuilder maps a draft pool to a 40-card deck before scoring.
+These examples were authored with AI assistance and still need independent review. They’re useful debugging cases, with proposed expectations that another drafter should be able to challenge.
 
-The game-card bonus model is an even simpler outcome model:
+### Flash with a reason to cast it
 
-```text
-logit(win_probability) = intercept + sum(card_in_maindeck * card_bonus) + covariates
-```
+**Pack:** Flash, Counterspell, Preordain.
 
-I tested pair-interaction variants, but they overfit relative to the card-only model. The learned top bonuses were plausible Powered Cube cards: Ancestral Recall, Time Walk, Black Lotus, Sol Ring, Mana Crypt, and the Moxen.
+**Starting pool:** Polluted Delta, Ponder, Elder Gargaroth.
 
-Finally, I generated static preference pairs for DPO. For a logged pick state, if one in-pack candidate has a sufficiently higher learned game-card bonus than another, that pair becomes `(preferred, rejected)`. DPO fine-tunes the pick policy toward those game-data preferences while anchoring it to the human-pick reference policy with a KL penalty. This gives the safe/aggressive trade-off in the table below.
+**Change:** Replace Elder Gargaroth with Worldspine Wurm.
 
-## Current offline results
+I expected Flash to gain ground against Counterspell. In both pools, the base policy ranked Counterspell first, Preordain second, and Flash last. More troublingly, Flash’s relative score fell after adding the Wurm. The aggressive configuration moved in the same wrong direction.
 
-On a held-out Powered Cube split, the strongest human-imitation model gets roughly:
+That doesn’t prove Flash must be the pick in every real draft containing a Wurm. These are tiny constructed pools. But it identifies a specific interaction to investigate, instead of leaving me with a vague feeling that the recommendations are off.
 
-| Model / setting | Human top-1 | Human top-3 | Game-data pref. acc. |
-|---|---:|---:|---:|
-| Human continued, no value rerank | 0.6240 | 0.9093 | 0.5494 |
-| Human continued + value rerank | 0.6234 | 0.9077 | 0.6062 |
-| Safer game-data DPO + value rerank | 0.6161 | 0.9048 | 0.6406 |
-| Aggressive game-data + value rerank | 0.5092 | 0.8411 | 0.7262 |
+### Reanimation has to respect the target
 
-It seems that the safer game-data model keeps most of the human-pick accuracy while improving game-data preference agreement. The aggressive model optimizes game-data preferences much harder, but it no longer behaves like a human drafter and often makes suspicious picks.
+**Pack:** Persist, Reanimate, Fatal Push.
 
-## How much does previous-pick context matter?
+**Starting pool:** Entomb, Bloodstained Mire, Archon of Cruelty.
 
-A lot. I tested the human-continued model by removing or corrupting the previous-pick context on a 20k held-out sample:
+**Change:** Replace Archon with Titania, Protector of Argoth.
 
-| Context | Top-1 | Top-3 | Same top pick as full context |
-|---|---:|---:|---:|
-| full pool + seen | 0.6168 | 0.9070 | 1.0000 |
-| no pool, keep seen | 0.4268 | 0.7545 | 0.5116 |
-| keep pool, no seen | 0.6160 | 0.9065 | 0.9409 |
-| no pool, no seen | 0.4070 | 0.7384 | 0.4856 |
-| shuffled pool | 0.3507 | 0.6533 | 0.4088 |
+[Persist](https://mtg.wtf/card/spg/42/Persist) can return a nonlegendary creature. Titania is legendary. Reanimate can return either creature, so replacing Archon with Titania removes a use for Persist that Reanimate retains.
 
-The pool matters enormously. The seen-but-unpicked channel matters much less in the current model.
+I expected Persist to lose ground against Reanimate. Both tested configurations moved the other way.
 
-## Adding inference-time search
+A broad “reanimator synergy” bonus could miss this distinction too. The assistant needs to know which spell works with which target. Matching colors and archetype names won’t be enough.
 
-The next experiment was to add **Monte Carlo tree search at inference time**. This is not training. The model is already trained; MCTS is a search procedure that evaluates each legal pick by simulating possible continuations of the draft and scoring the resulting pools.
+### A small response can still leave the combo last
 
-For each candidate pick, the search:
+**Pack:** Brain Freeze, Remand, Ponder.
 
-1. forces that pick,
-2. samples plausible future packs from the cube,
-3. completes the draft with the policy,
-4. builds/scores the final pool with the value model,
-5. combines rollout value with the policy prior.
+**Starting pool:** Underworld Breach, Polluted Delta, Scalding Tarn, Abrade.
 
-Because MTGA logs do not reveal hidden packs or opponent picks, this is an information-set approximation. It knows my pack and my pool, but future packs are sampled rather than perfectly reconstructed.
+**Change:** Replace Abrade with Lion’s Eye Diamond.
 
-Latency with the model loaded once, on CPU, using real 17lands pick states:
+Here, Brain Freeze gained ground against Remand in both tested configurations, as proposed. Yet it remained last in both rankings. The pool change produced a response, but not enough to change the recommendation.
 
-| Simulations | p50 | p95 | Mean |
-|---:|---:|---:|---:|
-| 10 | 418 ms | 574 ms | 378 ms |
-| 25 | 942 ms | 1370 ms | 850 ms |
-| 50 | 1825 ms | 2697 ms | 1642 ms |
+This matters when reading the results below. A directional check can pass on a tiny score movement. It doesn’t mean the assistant found the combo pick or understood how to execute it.
 
-So 25 simulations is a reasonable default for live search-based reranking.
+## What the numbers tell us
 
-The current MCTS default is:
+Here’s the current development replay. “Logged-pick agreement” means choosing the same card as the person in the log. The other column counts the nine paired checks described above.
 
-```text
---simulations 25
---rank-by final
---root-policy-weight 0.15
---root-value-weight 1.0
---root-value-mode prob
---rollout-temperature 0.0
---cpuct 1.5
-```
+| Configuration | Logged-pick agreement, 82 picks | Proposed direction followed, 9 pairs |
+|---|---:|---:|
+| Base policy, score adjustments off | 29/82 (35.4%) | 5/9 |
+| Current default | 29/82 (35.4%) | 5/9 |
+| Aggressive preference training + deck-value adjustment | 21/82 (25.6%) | 4/9 |
+| Fixed card-prior comparator | 20/82 (24.4%) | 0/9 |
 
-## A real depleted-pack example
+The base and default use the same outcome-weighted checkpoint. The default adds configured card priors and companion rules; its deck-value and heuristic synergy adjustments are off. The aggressive configuration changes both the trained model and the scoring adjustments, so this comparison doesn’t isolate either change.
 
-The following trace uses real packs from the held-out 17lands eval data. These are not independently sampled fake packs. They are the packs as seen by a real drafter, already depleted by previous picks. Pack sizes go from 14 down to 7.
+The fixed comparator uses an incomplete list of card priors with alphabetical tie-breaking. It isn’t an expert tier list. It also cannot respond to a pool change, so its zero in the last column follows from its design.
 
-Caveat: the later packs are real for the human's actual draft path. If a model makes a different earlier pick, the later packs are not a perfect counterfactual. Still, this is much closer to reality than testing on random packs.
+All 82 logged decisions come from just two drafts. Agreement with those choices is descriptive, and disagreement may sometimes be justified. None of the 150 cases has independently approved strategic labels yet. The replay is reproducible, but it doesn’t give us a reliable estimate of drafting skill or win rate.
 
-### The real packs
+The July experiments answer another question. On an archived sample of 20,000 human pick states, stronger preference training reduced agreement with the logged picks while increasing agreement with a separate model’s generated preferences:
 
-**Pick 1, pack size 14**
+| Historical configuration | Same first choice as human | Agreement with value-generated preferences |
+|---|---:|---:|
+| Continued human imitation | 62.4% | 54.9% |
+| Gentler preference training + value adjustment | 61.6% | 64.1% |
+| Aggressive preference training + value adjustment | 50.9% | 72.6% |
 
-Arena of Glory; Blood Crypt; Containment Priest; Endurance; Godless Shrine; Grief; Omnath, Locus of Creation; Ouroboroid; Skyclave Apparition; Snapcaster Mage; Sundering Titan; The Wandering Emperor; Wishclaw Talisman; Yavimaya, Cradle of Growth
+These are saved July results, not a fresh run of the repaired system. They also use different data and configurations from the small September replay, so the percentages shouldn’t be compared across tables as progress over time.
 
-**Pick 2, pack size 13**
+Most importantly, that right-hand column measures agreement with generated preferences. Calling it “game-data preference accuracy,” as I did before, made it too easy to read as evidence of better gameplay. Optimizing toward a teacher shows that the model can follow the teacher. The teacher still needs to be right.
 
-Birds of Paradise; Chain Lightning; Cosmogrand Zenith; Gitaxian Probe; Hymn to Tourach; Life // Death; Multiversal Passage; Soul-Guide Lantern; Talisman of Indulgence; Talisman of Unity; Torsten, Founder of Benalia; Wasteland; Witch Enchanter // Witch-Blessed Meadow
+The [revised paper](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf) gives the exact configurations, additional historical results, and artifact checks behind these tables.
 
-**Pick 3, pack size 12**
+## Back at the draft table
 
-Dark Confidant; Deathrite Shaman; Demonic Tutor; Expressive Iteration; Get Lost; Liliana of the Veil; Questing Druid // Seek the Beast; Razorverge Thicket; Sylvan Caryatid; Underground Mortuary; Virtue of Loyalty // Ardenvale Fealty; Windswept Heath
+One draft from the original post captures the frustration. I ended up with a controlling artifact deck, went 2–2, and won both games in which I played Ugin. I also made a costly mistake by forgetting to crew Reckoner Bankbuster and kill Kaito when I had the chance.
 
-**Pick 4, pack size 11**
+![The original pack-three, pick-one screenshot from the controlling artifact draft.](/mtga_cube_draft_assistant/pack3_pick1.png)
 
-Copperline Gorge; Elvish Reclaimer; Flickerwisp; Mine Collapse; Savai Triome; Scrubland; Talisman of Progress; Trumpeting Carnosaur; Unexpectedly Absent; Valki, God of Lies // Tibalt, Cosmic Impostor; Zuran Orb
+*A screenshot from the original draft, using an earlier cube and assistant version.*
 
-**Pick 5, pack size 10**
+It was an interesting deck to play. It didn’t tell me whether following the assistant made my draft better. My picks, deckbuilding, play decisions, and opponents all contributed to the result.
 
-Archon of Cruelty; Bleachbone Verge; Mana Confluence; Questing Beast; Sacred Foundry; Blazing Firesinger // Seething Song; Stomping Ground; Taiga; Tersa Lightshatter; Titania, Protector of Argoth
+The audit also found problems that made collecting better evidence harder: stale pool state could survive into a new draft, some loss labels were skipped, and game records could be associated with drafts solely because they occurred nearby in time. Those paths have been repaired. Unverified game-to-draft links are now excluded from training, and no new model has been trained from the repaired gameplay pipeline yet.
 
-**Pick 6, pack size 9**
+Those fixes make the system easier to evaluate. They don’t repair its strategic judgment by themselves.
 
-Crucible of Worlds; Emperor of Bones; Grim Lavamancer; Jetmir's Garden; Restless Cottage; Restless Fortress; Rofellos, Llanowar Emissary; Sanguine Evangelist; Vampire Hexmage
+## What I want from the next version
 
-**Pick 7, pack size 8**
+I want the assistant to identify what a developing deck is missing. For reanimator, that means keeping track of setup, compatible targets, and ways to return them. For a control deck, it also means noticing whether another expensive finisher leaves the early turns empty.
 
-Bone Shards; Collective Brutality; Exploration; Keen-Eyed Curator; Overgrown Tomb; Restless Vents; Utopia Sprawl; Winds of Abandon
+A combo piece should gain value when its partners are present, while the assistant still considers mana, redundancy, and how much draft remains. Early speculation and a pack-three commitment are different decisions. A useful recommendation should explain that difference in language I can act on.
 
-**Pick 8, pack size 7**
+For the Reanimate example, an explanation I’d like to see is: “You already have Entomb and Archon. Reanimate gives you a way to use them; another target leaves that job unfilled.” That’s a target for the redesign, not something the current assistant has demonstrated reliably.
 
-Celestial Colonnade; Deep-Cavern Bat; Gloomlake Verge; Jadar, Ghoulcaller of Nephalia; Prismatic Ending; Sink into Stupor // Soporific Springs; Talisman of Conviction
+The next steps are to get the contextual examples reviewed, represent these card packages explicitly, and build plausible decks before asking a value model to judge them. Then I want to compare completed drafts under controlled conditions and collect games with verified links to the recommendations actually followed. More search can wait until there’s a better-supported way to judge what it finds.
 
-### Model choices
-
-| Pick | Human log | Human imitation | Safe game-data | Aggressive game-data | MCTS |
-|---:|---|---|---|---|---|
-| 1 | Skyclave Apparition | Snapcaster Mage | Skyclave Apparition | Ouroboroid | Blood Crypt |
-| 2 | Gitaxian Probe | Gitaxian Probe | Cosmogrand Zenith | Birds of Paradise | Hymn to Tourach |
-| 3 | Windswept Heath | Demonic Tutor | Windswept Heath | Demonic Tutor | Demonic Tutor |
-| 4 | Scrubland | Scrubland | Unexpectedly Absent | Zuran Orb | Valki, God of Lies // Tibalt, Cosmic Impostor |
-| 5 | Sacred Foundry | Archon of Cruelty | Sacred Foundry | Titania, Protector of Argoth | Archon of Cruelty |
-| 6 | Sanguine Evangelist | Emperor of Bones | Sanguine Evangelist | Emperor of Bones | Emperor of Bones |
-| 7 | Winds of Abandon | Collective Brutality | Winds of Abandon | Keen-Eyed Curator | Bone Shards |
-| 8 | Deep-Cavern Bat | Deep-Cavern Bat | Prismatic Ending | Deep-Cavern Bat | Deep-Cavern Bat |
-
-### Final pools
-
-**Human log**
-
-Skyclave Apparition; Gitaxian Probe; Windswept Heath; Scrubland; Sacred Foundry; Sanguine Evangelist; Winds of Abandon; Deep-Cavern Bat
-
-**Human imitation**
-
-Snapcaster Mage; Gitaxian Probe; Demonic Tutor; Scrubland; Archon of Cruelty; Emperor of Bones; Collective Brutality; Deep-Cavern Bat
-
-**Safe game-data**
-
-Skyclave Apparition; Cosmogrand Zenith; Windswept Heath; Unexpectedly Absent; Sacred Foundry; Sanguine Evangelist; Winds of Abandon; Prismatic Ending
-
-**Aggressive game-data**
-
-Ouroboroid; Birds of Paradise; Demonic Tutor; Zuran Orb; Titania, Protector of Argoth; Emperor of Bones; Keen-Eyed Curator; Deep-Cavern Bat
-
-**MCTS value-conservative**
-
-Blood Crypt; Hymn to Tourach; Demonic Tutor; Valki, God of Lies // Tibalt, Cosmic Impostor; Archon of Cruelty; Emperor of Bones; Bone Shards; Deep-Cavern Bat
-
-## What happened in this example?
-
-The safe game-data model most closely follows the human's white/fixing lane. It takes Skyclave Apparition, Windswept Heath, Sacred Foundry, Sanguine Evangelist, and Winds of Abandon.
-
-The human-imitation model actually chases more raw power here: Snapcaster Mage, Demonic Tutor, Archon of Cruelty. That is interesting because it is the model optimized for human agreement overall, but on this trace it is less committed to the logged human's fixing-heavy path.
-
-The aggressive game-data model still looks unsafe. Picks like Ouroboroid, Zuran Orb, Titania, and Keen-Eyed Curator are plausible outputs of a model chasing static game-outcome bonuses, but they look contextually dubious.
-
-The most interesting part of the real-pack example is that MCTS appears to choose a lane and strategy early. After taking Blood Crypt, it moves into a black/red, maybe Rakdos-reanimator-ish, power lane: Hymn to Tourach, Demonic Tutor, Valki/Tibalt, Archon of Cruelty, Emperor of Bones, Bone Shards. Whether or not Blood Crypt is the best first pick, the later MCTS picks are at least coherent with that early commitment.
-
-The other models look less strategically consistent in this trace. Human imitation takes individually strong cards, but jumps between Snapcaster, Demonic Tutor, Scrubland, Archon, black interaction, and Deep-Cavern Bat without as clear a deck plan. Safe game-data follows the logged human's white/fixing lane more closely, but sometimes takes value/removal cards over synergy. Aggressive game-data mixes value and combo cards and produces the least coherent path. This suggest that search can amplify a questionable early lane choice, but it can also make the subsequent picks more internally consistent.
-
-## Current takeaways
-
-1. The base policy is already strong at human-pick imitation.
-2. Prior picks matter a lot; removing the pool cuts top-1 accuracy by about 20 points.
-3. Safe game-data tuning improves game-data preference agreement while mostly preserving human agreement.
-4. Aggressive game-data tuning is useful for analysis, but not safe as a default recommendation policy.
-5. MCTS is promising as an inference-time search/reranking method because it often commits to a lane and then chooses strong cards for that lane. Its disagreements still need auditing, especially when the initial lane choice is questionable.
-6. Real depleted-pack traces are much more informative than random pack examples.
-7. Function-aware k-NN makes live cube updates usable when cards are missing from the training data, but those cards should still be folded into future training data when possible.
-
-
-## Example from a live draft
-
-
-![P1P1](pack1_pick1.png)
-
-Pack 1, pick 1 shows all strategies rank Sol Ring the highest, because well it is the stringest card by far.  Next is Animate Dead, which is a strong card for the reanimate archetype.
-
-![P3P1](pack3_pick1.png)
-
-At pack 3, pick 1 we've taken a bit of a controlling artifacts deck.  In which Staff of the Storyteller or Tezzeret would fit nicely into.  But Ugin is very strong, providing removal, ramp, and card draw in a single car, and we have a good amount of acceleration and colorless artifacts that he might work well.
-
-The deck ultimately ended up fine, not fantastic.  Went 2-2.  2nd loss was due to 
-my misplay (forgot to crew bankbuster and kill Kaito when I had the chance). 
-Both wins were with playing Ugin (once the opponent scooped immediately and 
-the other time I exiled their remaining board the next turn.  But was the deck capable
-of 7 wins?  Doubtful.  Was it interesting?  Very.  I hope to get more runs and data 
-from the next round of cube draft.
+The test I keep coming back to is that first pack. If the assistant sees Worldspine Wurm arrive in my pool, I want its advice about Flash to change for a reason a drafter can recognize. There’s still work to do before I can trust it with the rest of the draft.
