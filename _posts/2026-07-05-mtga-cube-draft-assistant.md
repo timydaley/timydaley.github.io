@@ -1,13 +1,11 @@
 ---
 layout: post
 title: "Building an MTGA Cube Draft Assistant"
-date: 2026-07-05
+date: 2026-09-20
 last_modified_at: 2026-09-20
 description: "What Flash, reanimation targets, and a disappointing draft taught me about evaluating an Arena Powered Cube assistant."
 categories: magic machine-learning drafting
 ---
-
-*Rewritten September 20, 2026, after auditing the models and evaluation.*
 
 You have Worldspine Wurm in your pool. The next pack offers Flash, Counterspell, and Preordain.
 
