@@ -133,15 +133,3 @@ It was an interesting deck to play. It didn’t tell me whether following the as
 The audit also found problems that made collecting better evidence harder: stale pool state could survive into a new draft, some loss labels were skipped, and game records could be associated with drafts solely because they occurred nearby in time. Those paths have been repaired. Unverified game-to-draft links are now excluded from training, and no new model has been trained from the repaired gameplay pipeline yet.
 
 Those fixes make the system easier to evaluate. They don’t repair its strategic judgment by themselves.
-
-## What I want from the next version
-
-I want the assistant to identify what a developing deck is missing. For reanimator, that means keeping track of setup, compatible targets, and ways to return them. For a control deck, it also means noticing whether another expensive finisher leaves the early turns empty.
-
-A combo piece should gain value when its partners are present, while the assistant still considers mana, redundancy, and how much draft remains. Early speculation and a pack-three commitment are different decisions. A useful recommendation should explain that difference in language I can act on.
-
-For the Reanimate example, an explanation I’d like to see is: “You already have Entomb and Archon. Reanimate gives you a way to use them; another target leaves that job unfilled.” That’s a target for the redesign, not something the current assistant has demonstrated reliably.
-
-The next steps are to get the contextual examples reviewed, represent these card packages explicitly, and build plausible decks before asking a value model to judge them. Then I want to compare completed drafts under controlled conditions and collect games with verified links to the recommendations actually followed. More search can wait until there’s a better-supported way to judge what it finds.
-
-The test I keep coming back to is that first pack. If the assistant sees Worldspine Wurm arrive in my pool, I want its advice about Flash to change for a reason a drafter can recognize. There’s still work to do before I can trust it with the rest of the draft.
