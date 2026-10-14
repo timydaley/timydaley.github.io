@@ -1,135 +1,136 @@
 ---
 layout: post
 title: "Building an MTGA Cube Draft Assistant"
-date: 2026-09-20
-last_modified_at: 2026-09-20
-description: "What Flash, reanimation targets, and a disappointing draft taught me about evaluating an Arena Powered Cube assistant."
+date: 2026-10-13
+last_modified_at: 2026-10-13
+description: "Learning card combinations from draft choices and game results in Arena Powered Cube."
 categories: magic machine-learning drafting
 ---
 
 You have Worldspine Wurm in your pool. The next pack offers Flash, Counterspell, and Preordain.
 
-Counterspell and Preordain are easy cards to like. Flash needs a reason. With the Wurm, you have one: put it onto the battlefield, decline to pay the extra mana, and sacrifice it. Its death trigger leaves three 5/5 tramplers. That should change how you look at this pack.
+Counterspell and Preordain are strong cards. Flash becomes interesting because of what you already have: put the Wurm
+onto the battlefield, decline to pay the extra mana, and sacrifice it. Its death trigger leaves three 5/5 tramplers.
+That interaction should change how the assistant evaluates the pack, even if it doesn't settle the pick.
 
-I built an assistant to help with exactly these decisions in MTG Arena Powered Cube. I’ve been unhappy with its recommendations in actual play. The offline numbers looked more encouraging than the decks, and combo picks were a particular frustration.
+This is the problem I've been working on with my Arena Powered Cube draft assistant. A ranking of individual cards is a
+useful starting point. Building a deck requires deciding which cards belong together, what the pool is missing, and
+whether the mana can support the plan.
 
-So I went back through the system and its evaluation. In a small test built around that Flash pack, adding Worldspine Wurm actually moved Flash’s score in the wrong direction relative to Counterspell. The assistant had access to the pool. It still failed the interaction I wanted it to recognize.
+The current model starts with 17Lands card win rates and learns adjustments from draft choices and my game results. It
+responds correctly to some combinations, still misses others, and now has enough recorded games to show results by model
+version.
 
-That result is a useful place to start explaining what I’ve built, what went wrong, and what I want the next version to do.
+## From a card ranking to a draft pick
 
-## Start with the deck you’re trying to build
+A draft gives each player 45 cards, selected one at a time from passing packs. The eventual deck needs at least 40
+cards, including basic lands added afterward. Some picks won't make the deck. Others are speculative until the right
+support arrives. [Bertram and colleagues](https://arxiv.org/pdf/2105.11864) describe this as learning which card best
+extends an existing collection.
 
-Arena Powered Cube rewards cards that do something outrageous together. It also rewards being able to cast your spells and having a turn-two play.
+In Powered Cube, that distinction matters. Entomb and Archon of Cruelty make a spell that returns creatures from the
+graveyard especially useful. A pool with several reanimation spells and no worthwhile target has a different need.
+Meanwhile, a fetch land or cheap removal spell can be more valuable than another piece of an ambitious plan.
 
-The [official Arena Powered Cube guide](https://magic.wizards.com/en/news/mtg-arena/arena-powered-cube-draft) covers both ends: individually powerful cards, combinations such as Underworld Breach with Brain Freeze and Lion’s Eye Diamond, and decks that mix several plans. That’s the balance I want the assistant to understand.
+I use Games in Hand win rate, or GIH WR, from a September 24 export of 17Lands ratings as the starting ranking. With an
+empty pool, the assistant follows that ordering exactly. Once I've picked a card, learned contextual adjustments can
+change the order.
 
-Suppose you already have Entomb and Archon of Cruelty. Reanimate fills a very specific hole. Another enormous creature might be useful, but it doesn’t solve the same problem. If you already have several ways to bring creatures back and nothing worth returning, that decision changes.
+GIH WR is an observed result from decks and players that used a card. It doesn't tell us how much adding that card would
+improve this particular pool. That's the job of the contextual model.
 
-The same reasoning applies to less spectacular picks. A deck full of expensive threats may need cheap interaction. A multicolor pool may need fixing before another splash card. Recognizing a combo should help the assistant see those tradeoffs, including when pursuing the combo costs too much.
+## What the model knows about a card
 
-Older Arena Cube strategy writing makes this concrete by asking what each card contributes to your plan. [MTG Arena Zone’s general strategy guide](https://mtgazone.com/arena-cube-draft-a-general-in-depth-strategy-guide/) works through examples involving aggressive decks, expensive threats, and removal. Its card recommendations belong to an older cube, but that habit of explaining a pick through the deck is useful here.
+Each card has a 64-dimensional representation built from three parts: a learned identity vector, structured attributes,
+and a representation of its rules text.
 
-## What the assistant actually sees
+The attributes include mana value, colors, color identity, card types, power and toughness, rarity, and keywords. The
+text input includes the mana cost, full type line, rules text, and power and toughness. A frozen MiniLM language model
+encodes that text; a learned projection adapts it for drafting. The current model inherits card representations from
+earlier draft training rather than starting them from scratch.
 
-The assistant reads the current pack, my drafted cards, cards I’ve seen and passed, the pick number, and the configured cube list. It starts with a model trained to imitate choices in public 17Lands draft logs. Previous picks already influence its scores.
+For each card in the pack, attention looks at the cards already drafted. A separate statistical adjustment captures
+whether players select that card more often when a particular partner is in their pool. Those associations can reflect
+combinations, colors, or broader deck plans. They aren't verified rules about how cards interact.
 
-I then experimented with learning from game results. One model estimates the strength of a completed deck. Another learns a bonus for each card from the decks it appears in. I used those bonuses to generate preferred picks and train the assistant to follow them more closely.
+The model also sees passed cards, draft position, and whether the observed history is complete. There is no explicit
+list of completed combos or rules engine checking legal targets. Having the text available gives the model useful
+information, but doesn't guarantee that it understands an interaction.
 
-There’s a catch: the card-only bonus doesn’t change when the pool changes. The pick model can see Entomb and Archon, while its training target keeps rewarding the same ordering of cards. A model with contextual inputs can still be pushed toward a largely fixed pick order.
+## Learning from my games
 
-The completed-deck model had a different problem. During drafting, a simple deckbuilder filled an incomplete pool with basic lands before evaluating it. Early in pack one, that can mean judging one spell and 39 basics. A model trained on finished decks has little reason to give useful advice about that input.
+The contextual model trains on 87,999 public draft decisions. Personal fine-tuning uses 180 picks from four drafts and
+67 games, including losses.
 
-New cards also need special handling as the cube changes. The assistant can borrow representations from similar known cards, using metadata, rules text, and role tags. That helps it produce recommendations for unfamiliar cards; it doesn’t establish that it understands their combos. My original writeup also overstated the main pick model’s use of rules text. That text is part of the fallback, while the main model uses learned card representations and structured attributes.
+Games influence training in two ways. When a game can be linked to a draft, that draft's results adjust the weight of
+its recorded picks. The adjustment is smoothed so a handful of wins doesn't dominate training, and losing drafts still
+contribute.
 
-## Put the same pack in two different pools
+An auxiliary task predicts my game result from my deck and the opponent cards observed during play. Each side has its
+own summaries of cards and pair interactions. Opponent information is incomplete, so an observed set of cards isn't
+treated as a full deck list. This task changes the card representations used by the pick model; it doesn't directly add
+a win bonus to a recommendation.
 
-Before training another version, I wanted an evaluation that exposed these problems directly.
+This gives the assistant a way to learn from both sides of a game without my writing a rule for every combination. It
+also leaves an attribution problem: a win doesn't tell us which card, interaction, or play decision caused it.
 
-I assembled a queue of 150 cases tied to a saved 540-card cube list: 126 logged decisions and 24 deliberately constructed situations. The development portion contains 82 logged picks and nine pairs of constructed situations. Fifty cases remain reserved and unevaluated.
+## Does the same pack get different advice?
 
-For each pair, the pack stays fixed and one card in the pool changes. Then I check whether the focal card gains or loses ground against a specified alternative. This tests a narrower question than “did it make the best pick?” It asks whether a relevant change in the pool moved its judgment in the proposed direction.
+I evaluate contextual responses by holding the pack fixed and changing one card in the pool. Then I measure how the
+score difference between two candidates changes. The GIH prior cancels in that comparison, leaving the response to
+context.
 
-These examples were authored with AI assistance and still need independent review. They’re useful debugging cases, with proposed expectations that another drafter should be able to challenge.
+The current checkpoint follows the proposed direction in seven of nine development cases. Only one changes the top
+recommendation: Channel becomes the first choice when its payoff is present. These cases are debugging tools developed
+with AI assistance and informal player review, not an independent measure of drafting skill.
 
-### Flash with a reason to cast it
+For the Flash example, replacing Elder Gargaroth with Worldspine Wurm now raises Flash's score relative to Counterspell.
+The recommendation at the top still stays the same. That's a useful response, but a narrower result than demonstrating a
+better pick.
 
-**Pack:** Flash, Counterspell, Preordain.
+In a pool containing Underworld Breach, replacing Abrade with Lion's Eye Diamond raises Brain Freeze's score relative to
+Remand. Brain Freeze already leads in the control pool, so this case also passes without changing the recommended card.
 
-**Starting pool:** Polluted Delta, Ponder, Elder Gargaroth.
+Reanimation exposes two remaining problems. Adding a target reduces Reanimate's score relative to Griselbrand, when the
+expected response is an increase. In another case, replacing Archon of Cruelty with Titania increases Persist's score
+relative to Reanimate. Persist cannot return the legendary Titania, so that response goes the wrong way. Reanimate
+remains the top choice in both states, illustrating why a plausible recommendation alone doesn't establish correct
+treatment of the interaction.
 
-**Change:** Replace Elder Gargaroth with Worldspine Wurm.
+On historical validation data, the model matches 1,138 of 2,048 recorded choices, or 55.57%. That validation set has
+been reused during development. It also matches 106 of the 180 personal picks used in training, or 58.89%; that second
+number measures training fit. Neither percentage measures combo recognition or game win rate.
 
-I expected Flash to gain ground against Counterspell. In both pools, the base policy ranked Counterspell first, Preordain second, and Flash last. More troublingly, Flash’s relative score fell after adding the Wurm. The aggressive configuration moved in the same wrong direction.
+## Results at the draft table
 
-That doesn’t prove Flash must be the pick in every real draft containing a Wurm. These are tiny constructed pools. But it identifies a specific interaction to investigate, instead of leaving me with a vague feeling that the recommendations are off.
+The game records can be linked to 17 complete drafts. Six were drafted without the helper; the remaining drafts have
+recorded model configurations. Here are the results grouped by version:
 
-### Reanimation has to respect the target
+| Model version | Drafts | Wins | Losses | Games | Win rate |
+|---|---:|---:|---:|---:|---:|
+| Without draft helper | 6 | 17 | 18 | 35 | 48.6% |
+| Sept. 21 — Pool attention + card associations | 3 | 11 | 9 | 20 | 55.0% |
+| Sept. 22 — Personal fine-tuning | 1 | 2 | 3 | 5 | 40.0% |
+| Sept. 24 — GIH prior + personal fine-tuning | 7 | 31 | 17 | 48 | 64.6% |
+| Total | 17 | 61 | 47 | 108 | 56.5% |
 
-**Pack:** Persist, Reanimate, Fatal Push.
+Win rate is wins divided by games within each group. Fourteen other game records lack a unique link to a complete draft
+and are excluded from this table.
 
-**Starting pool:** Entomb, Bloodstained Mire, Archon of Cruelty.
+![Win rate for each of 17 drafts, with model checkpoint transitions
+marked.](/mtga_cube_draft_assistant/winrate_over_time.png)
 
-**Change:** Replace Archon with Titania, Protector of Argoth.
+Each point shows that draft's own win rate. The dashed lines mark the first draft associated with each recorded model
+version; the labels give its training date. They aren't exact training times on the draft axis.
 
-[Persist](https://mtg.wtf/card/spg/42/Persist) can return a nonlegendary creature. Titania is legendary. Reanimate can return either creature, so replacing Archon with Titania removes a use for Persist that Reanimate retains.
+The latest version is associated with 31 wins in 48 games, compared with 17 wins in 35 games without the helper. That's
+encouraging, but these are small groups from one player, with different decks and opponents. The September 22 result
+comes from just one draft. Recorded configurations can also come from replaying logs, so they do not establish that
+every recommendation was displayed or followed during play.
 
-I expected Persist to lose ground against Reanimate. Both tested configurations moved the other way.
+More training data and later model versions arrived together. These results cannot isolate the effect of additional
+training examples, or establish that the assistant caused the higher win rate. They do show the outcomes draft by draft,
+including the earlier games and the losses.
 
-A broad “reanimator synergy” bonus could miss this distinction too. The assistant needs to know which spell works with which target. Matching colors and archetype names won’t be enough.
-
-### A small response can still leave the combo last
-
-**Pack:** Brain Freeze, Remand, Ponder.
-
-**Starting pool:** Underworld Breach, Polluted Delta, Scalding Tarn, Abrade.
-
-**Change:** Replace Abrade with Lion’s Eye Diamond.
-
-Here, Brain Freeze gained ground against Remand in both tested configurations, as proposed. Yet it remained last in both rankings. The pool change produced a response, but not enough to change the recommendation.
-
-This matters when reading the results below. A directional check can pass on a tiny score movement. It doesn’t mean the assistant found the combo pick or understood how to execute it.
-
-## What the numbers tell us
-
-Here’s the current development replay. “Logged-pick agreement” means choosing the same card as the person in the log. The other column counts the nine paired checks described above.
-
-| Configuration | Logged-pick agreement, 82 picks | Proposed direction followed, 9 pairs |
-|---|---:|---:|
-| Base policy, score adjustments off | 29/82 (35.4%) | 5/9 |
-| Current default | 29/82 (35.4%) | 5/9 |
-| Aggressive preference training + deck-value adjustment | 21/82 (25.6%) | 4/9 |
-| Fixed card-prior comparator | 20/82 (24.4%) | 0/9 |
-
-The base and default use the same outcome-weighted checkpoint. The default adds configured card priors and companion rules; its deck-value and heuristic synergy adjustments are off. The aggressive configuration changes both the trained model and the scoring adjustments, so this comparison doesn’t isolate either change.
-
-The fixed comparator uses an incomplete list of card priors with alphabetical tie-breaking. It isn’t an expert tier list. It also cannot respond to a pool change, so its zero in the last column follows from its design.
-
-All 82 logged decisions come from just two drafts. Agreement with those choices is descriptive, and disagreement may sometimes be justified. None of the 150 cases has independently approved strategic labels yet. The replay is reproducible, but it doesn’t give us a reliable estimate of drafting skill or win rate.
-
-The July experiments answer another question. On an archived sample of 20,000 human pick states, stronger preference training reduced agreement with the logged picks while increasing agreement with a separate model’s generated preferences:
-
-| Historical configuration | Same first choice as human | Agreement with value-generated preferences |
-|---|---:|---:|
-| Continued human imitation | 62.4% | 54.9% |
-| Gentler preference training + value adjustment | 61.6% | 64.1% |
-| Aggressive preference training + value adjustment | 50.9% | 72.6% |
-
-These are saved July results, not a fresh run of the repaired system. They also use different data and configurations from the small September replay, so the percentages shouldn’t be compared across tables as progress over time.
-
-Most importantly, that right-hand column measures agreement with generated preferences. Calling it “game-data preference accuracy,” as I did before, made it too easy to read as evidence of better gameplay. Optimizing toward a teacher shows that the model can follow the teacher. The teacher still needs to be right.
-
-The [revised paper](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf) gives the exact configurations, additional historical results, and artifact checks behind these tables.
-
-## Back at the draft table
-
-One draft from the original post captures the frustration. I ended up with a controlling artifact deck, went 2–2, and won both games in which I played Ugin. I also made a costly mistake by forgetting to crew Reckoner Bankbuster and kill Kaito when I had the chance.
-
-![The original pack-three, pick-one screenshot from the controlling artifact draft.](/mtga_cube_draft_assistant/pack3_pick1.png)
-
-*A screenshot from the original draft, using an earlier cube and assistant version.*
-
-It was an interesting deck to play. It didn’t tell me whether following the assistant made my draft better. My picks, deckbuilding, play decisions, and opponents all contributed to the result.
-
-The audit also found problems that made collecting better evidence harder: stale pool state could survive into a new draft, some loss labels were skipped, and game records could be associated with drafts solely because they occurred nearby in time. Those paths have been repaired. Unverified game-to-draft links are now excluded from training, and no new model has been trained from the repaired gameplay pipeline yet.
-
-Those fixes make the system easier to evaluate. They don’t repair its strategic judgment by themselves.
+The [paper](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf) describes the current model, training procedure,
+contextual diagnostics, and game analysis in detail.
