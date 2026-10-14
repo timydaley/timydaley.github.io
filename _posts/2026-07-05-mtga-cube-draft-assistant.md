@@ -1,110 +1,100 @@
 ---
 layout: post
 title: "Building an MTGA Cube Draft Assistant"
-date: 2026-10-13
-last_modified_at: 2026-10-13
-description: "Learning card combinations from draft choices and game results in Arena Powered Cube."
+date: 2026-07-05
+last_modified_at: 2026-09-20
+description: "RL-guided assistance for MTGA powered cube"
 categories: magic machine-learning drafting
 ---
 
-You have Worldspine Wurm in your pool. The next pack offers Flash, Counterspell, and Preordain.
 
-Counterspell and Preordain are strong cards. Flash becomes interesting because of what you already have: put the Wurm
-onto the battlefield, decline to pay the extra mana, and sacrifice it. Its death trigger leaves three 5/5 tramplers.
-That interaction should change how the assistant evaluates the pack, even if it doesn't settle the pick.
+# Intro
 
-This is the problem I've been working on with my Arena Powered Cube draft assistant. A ranking of individual cards is a
-useful starting point. Building a deck requires deciding which cards belong together, what the pool is missing, and
-whether the mana can support the plan.
+I love mathematical card games.  Originally this was poker, but now it's 
+Magic the Gathering.  Strategic thinking under uncertainty is particularly
+compelling to me, and is also applicable to my job in developing machine
+learning algorithms.  Which, of course, means I should apply what I've 
+learned in my career and research to the problem of mathematical card games.
 
-The current model starts with 17Lands card win rates and learns adjustments from draft choices and my game results. It
-responds correctly to some combinations, still misses others, and now has enough recorded games to show results by model
-version.
+In MtG(Magic the Gathering) there are many ways to play.  One of the most 
+challenging ways is Limited, or drafting. 
+From [Bertram et al. 2021](https://arxiv.org/pdf/2105.11864), 
 
-## From a card ranking to a draft pick
+> In contrast to formats where decks are constructed
+separately from playing, drafting features a first game phase in
+which players form a pool of cards, from which they later build
+their decks. The pool of cards is chosen from semi-random
+selections of cards, so-called packs. Each pack of MTG cards
+consists of 15 different cards of four different rarities: eleven
+Common, three Uncommon, and one Rare or Mythic card.1
+Rare cards appear more frequently than Mythic ones. Over
+the course of the whole draft, each player chooses a deck of
+45 cards sequentially. Players get their cards by choosing from
+many packs as follows: Each of the eight players in a draft
+starts with a full pack of 15 cards, selects a single card from
+it, and passes the remaining 14 cards on to the next player. In
+the following rounds, players select from 14, 13, . . . cards. This
+process continues until all 15 cards of the original packs are
+chosen. This process is repeated for an additional two packs,
+such that each player selects 45 cards in total. In each round,
+packs are passed around in the same direction.
 
-A draft gives each player 45 cards, selected one at a time from passing packs. The eventual deck needs at least 40
-cards, including basic lands added afterward. Some picks won't make the deck. Others are speculative until the right
-support arrives. [Bertram and colleagues](https://arxiv.org/pdf/2105.11864) describe this as learning which card best
-extends an existing collection.
+In this way, there is not only the strategy of playing but there
+is also the additional strategy associated with selecting which
+cards to draft.  Part of this is identifying which cards are powerful,
+but also which cards work together and are playable in what will
+be your deck.  For example, drafting 
+[Cryptic Command](https://scryfall.com/card/ima/48/cryptic-command)
+in a white-red aggressive deck will not work well. 
 
-In Powered Cube, that distinction matters. Entomb and Archon of Cruelty make a spell that returns creatures from the
-graveyard especially useful. A pool with several reanimation spells and no worthwhile target has a different need.
-Meanwhile, a fetch land or cheap removal spell can be more valuable than another piece of an ambitious plan.
+In my opinion the pinnacle of drafting is cube draft.  I was first
+introduced to cube draft by my friend Adam Ericksen.  
+There's a deep understanding is required to identify what cards work well 
+together, what strategies or lanes are open and available,
+and having cards that can answer, block, or stymie
+what your oppenents are trying to do.  
 
-I use Games in Hand win rate, or GIH WR, from a September 24 export of 17Lands ratings as the starting ranking. With an
-empty pool, the assistant follows that ordering exactly. Once I've picked a card, learned contextual adjustments can
-change the order.
+For example, suppose you've started a draft with a 
+[Phelia](https://scryfall.com/card/mh3/40/phelia-exuberant-shepherd)
+followed by a fetch land and a [Fury](https://scryfall.com/card/mh2/126/fury).  
+The next pack you see an
+[Archon of Cruelty](https://scryfall.com/card/frc/47/archon-of-cruelty), 
+the best reanimation target.  This indicates that 
+reanimation might be a strategy to consider because none of the
+players in front of you have selected that card.  
 
-GIH WR is an observed result from decks and players that used a card. It doesn't tell us how much adding that card would
-improve this particular pool. That's the job of the contextual model.
 
-## What the model knows about a card
 
-Each card has a 64-dimensional representation built from three parts: a learned identity vector, structured attributes,
-and a representation of its rules text.
+# A draft helper
 
-The attributes include mana value, colors, color identity, card types, power and toughness, rarity, and keywords. The
-text input includes the mana cost, full type line, rules text, and power and toughness. A frozen MiniLM language model
-encodes that text; a learned projection adapts it for drafting. The current model inherits card representations from
-earlier draft training rather than starting them from scratch.
+My drafting ability is quite mid, despite my understanding of the game.
+Part of that I don't fully have a good grasp on all of the strategies, 
+part of that is a lack of experience.  
+So to help me I decided to build a draft helper to 
+assist with draft picks.  
 
-For each card in the pack, attention looks at the cards already drafted. A separate statistical adjustment captures
-whether players select that card more often when a particular partner is in their pool. Those associations can reflect
-combinations, colors, or broader deck plans. They aren't verified rules about how cards interact.
 
-The model also sees passed cards, draft position, and whether the observed history is complete. There is no explicit
-list of completed combos or rules engine checking legal targets. Having the text available gives the model useful
-information, but doesn't guarantee that it understands an interaction.
+To warm-start the model I used 
+card embeddings 
+(color, mana value, power/toughness, card rules text, etc).
+as well as [17lands](https://www.17lands.com/card_data?expansion=Cube+-+Powered&format=PremierDraft&time_period=LATEST_EVENT)
+Game-In-Hand card ranking.  
+This metric tells us the winning rate of a card if it is drawn at any point in 
+a game. Note that 17lands win rates average to higher than 50% because 
+the pool of players who use 17lands have a higher than average win rate.
+The next information we can use is our own selection win rates.  
+For a given card selected, what was it's win rate, as well as the
+win rate in combination with other cards selected.  
+Finally, we also have information from our opponents.  We
+see which cards they play (but not all cards they draw) and can penalize
+cards we see from our opponents when we win (and they lose)
+and reward cards we see them play when we lose. 
 
-## Learning from my games
+Full description of the model is available 
+[here](https://timydaley.github.io/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf). 
 
-The contextual model trains on 87,999 public draft decisions. Personal fine-tuning uses 180 picks from four drafts and
-67 games, including losses.
 
-Games influence training in two ways. When a game can be linked to a draft, that draft's results adjust the weight of
-its recorded picks. The adjustment is smoothed so a handful of wins doesn't dominate training, and losing drafts still
-contribute.
-
-An auxiliary task predicts my game result from my deck and the opponent cards observed during play. Each side has its
-own summaries of cards and pair interactions. Opponent information is incomplete, so an observed set of cards isn't
-treated as a full deck list. This task changes the card representations used by the pick model; it doesn't directly add
-a win bonus to a recommendation.
-
-This gives the assistant a way to learn from both sides of a game without my writing a rule for every combination. It
-also leaves an attribution problem: a win doesn't tell us which card, interaction, or play decision caused it.
-
-## Does the same pack get different advice?
-
-I evaluate contextual responses by holding the pack fixed and changing one card in the pool. Then I measure how the
-score difference between two candidates changes. The GIH prior cancels in that comparison, leaving the response to
-context.
-
-The current checkpoint follows the proposed direction in seven of nine development cases. Only one changes the top
-recommendation: Channel becomes the first choice when its payoff is present. These cases are debugging tools developed
-with AI assistance and informal player review, not an independent measure of drafting skill.
-
-For the Flash example, replacing Elder Gargaroth with Worldspine Wurm now raises Flash's score relative to Counterspell.
-The recommendation at the top still stays the same. That's a useful response, but a narrower result than demonstrating a
-better pick.
-
-In a pool containing Underworld Breach, replacing Abrade with Lion's Eye Diamond raises Brain Freeze's score relative to
-Remand. Brain Freeze already leads in the control pool, so this case also passes without changing the recommended card.
-
-Reanimation exposes two remaining problems. Adding a target reduces Reanimate's score relative to Griselbrand, when the
-expected response is an increase. In another case, replacing Archon of Cruelty with Titania increases Persist's score
-relative to Reanimate. Persist cannot return the legendary Titania, so that response goes the wrong way. Reanimate
-remains the top choice in both states, illustrating why a plausible recommendation alone doesn't establish correct
-treatment of the interaction.
-
-On historical validation data, the model matches 1,138 of 2,048 recorded choices, or 55.57%. That validation set has
-been reused during development. It also matches 106 of the 180 personal picks used in training, or 58.89%; that second
-number measures training fit. Neither percentage measures combo recognition or game win rate.
-
-## Results at the draft table
-
-The game records can be linked to 17 complete drafts. Six were drafted without the helper; the remaining drafts have
-recorded model configurations. Here are the results grouped by version:
+# Model performance
 
 | Model version | Drafts | Wins | Losses | Games | Win rate |
 |---|---:|---:|---:|---:|---:|
@@ -114,23 +104,30 @@ recorded model configurations. Here are the results grouped by version:
 | Sept. 24 — GIH prior + personal fine-tuning | 7 | 31 | 17 | 48 | 64.6% |
 | Total | 17 | 61 | 47 | 108 | 56.5% |
 
-Win rate is wins divided by games within each group. Fourteen other game records lack a unique link to a complete draft
-and are excluded from this table.
+![Winrate over time](/mtga_cube_draft_assistant/winrate_over_time.png)
 
-![Win rate for each of 17 drafts, with model checkpoint transitions
-marked.](/mtga_cube_draft_assistant/winrate_over_time.png)
+# Example
 
-Each point shows that draft's own win rate. The dashed lines mark the first draft associated with each recorded model
-version; the labels give its training date. They aren't exact training times on the draft axis.
+Here's an example of the model suggestions from a real draft.  
 
-The latest version is associated with 31 wins in 48 games, compared with 17 wins in 35 games without the helper. That's
-encouraging, but these are small groups from one player, with different decks and opponents. The September 22 result
-comes from just one draft. Recorded configurations can also come from replaying logs, so they do not establish that
-every recommendation was displayed or followed during play.
+![](/mtga_cube_draft_assistant/portal-draft-example.png)
 
-More training data and later model versions arrived together. These results cannot isolate the effect of additional
-training examples, or establish that the assistant caused the higher win rate. They do show the outcomes draft by draft,
-including the earlier games and the losses.
+[Portal to Phyrexia](https://scryfall.com/card/bro/240/portal-to-phyrexia)
+is a great choice in a Tinker deck.  Additionally, Phelia
+can blink the Portal to act as repeatable removal and grow Phelia.
+It works so much better with the cards we have in the deck than 
+anything else.  Ravenous robots can work well if we want to lean into
+Bolas' Citadel, but Portal is stronger and we may want to consider dropping 
+Citadel in favor of Portal for the primary Tinker target.
 
-The [paper](/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf) describes the current model, training procedure,
-contextual diagnostics, and game analysis in detail.
+![](/mtga_cube_draft_assistant/balance-draft-example.png)
+
+In pack 2 Balance is suggested, and it works very well in our deck.  
+We will be artifact heavy, with a low curve, and want to spew out 
+cheap costing artifacts quickly.  This works very well in a Balance
+deck, and can put our opponent on an uphill climb in terms of 
+resources.  
+
+I ended up going 5-3 with this deck.  Two losses were due to clear 
+misplays on my part.  Like decking myself with two Nexus of Becoming
+out.  But a very fun and interesting deck to play. 
