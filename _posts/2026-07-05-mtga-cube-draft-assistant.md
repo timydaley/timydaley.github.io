@@ -75,13 +75,23 @@ assist with draft picks.
 
 
 To warm-start the model I used 
-card embeddings 
-(color, mana value, power/toughness, card rules text, etc).
-as well as [17lands](https://www.17lands.com/card_data?expansion=Cube+-+Powered&format=PremierDraft&time_period=LATEST_EVENT)
+a learned identity embedding, with structured attributes such as mana cost and 
+color, and a frozen MiniLM embedding of its rules text.
+Four-head attention lets each candidate card attend to previously drafted cards. 
+The model trains on about 88,000 human draft decisions using cross-entropy over 
+the cards actually offered in each pack.
+I next added [17lands](https://www.17lands.com/card_data?expansion=Cube+-+Powered&format=PremierDraft&time_period=LATEST_EVENT)
 Game-In-Hand card ranking.  
 This metric tells us the winning rate of a card if it is drawn at any point in 
 a game. Note that 17lands win rates average to higher than 50% because 
 the pool of players who use 17lands have a higher than average win rate.
+I added a fixed score derived from the normalized log-odds of 
+the 17Lands GIH win rate. So the baseline score is the relative
+ranking of 17lands GIH win rate.  
+Training then learns pool-dependent corrections, supplemented by historical 
+statistics measuring whether a card is picked more often when another card 
+is already in the pool.
+
 The next information we can use is our own selection win rates.  
 For a given card selected, what was it's win rate, as well as the
 win rate in combination with other cards selected.  
@@ -89,6 +99,23 @@ Finally, we also have information from our opponents.  We
 see which cards they play (but not all cards they draw) and can penalize
 cards we see from our opponents when we win (and they lose)
 and reward cards we see them play when we lose. 
+Picks receive a smoothed weight based on their draft’s results. 
+We use reward-informed offline policy adaptation to adapt to 
+actual picks and game outcomes.  
+We backpropagate game outcome-prediction and pick 
+behavior cloning (imitation loss) rather 
+than directly maximize expected win reward.
+For example, if a combination appears in a winning deck but the 
+outcome predictor assigns a low win probability, the training gradient adjusts 
+the representations toward a higher predicted probability for that observation. 
+Losses provide the opposite signal. 
+This does not establish which combination caused the result, instead the model learns 
+statistical associations.
+
+Because we are training on what I actually chose during previous
+drafts, I've found the model tends to upweight strategies that I have historically
+had success with like reanimator, artifacts, and control tempo. 
+
 
 Full description of the model is available 
 [here](https://timydaley.github.io/mtga_cube_draft_assistant/mtga_cube_draft_icml2026.pdf). 
@@ -105,6 +132,14 @@ Full description of the model is available
 | Total | 17 | 61 | 47 | 108 | 56.5% |
 
 ![Winrate over time](/mtga_cube_draft_assistant/winrate_over_time.png)
+
+You can see that my win rate prior to this experiment was ~50%, which
+is pretty poor.  Due to the prize structure that win rate will lose 
+pretty quickly.  
+After the final model fine-tuning the win rate improved dramatically, though
+the sample size is small.  
+I think the experience and the suggestions made me think much more about
+cards in a holistic sense. 
 
 # Example
 
@@ -129,5 +164,9 @@ deck, and can put our opponent on an uphill climb in terms of
 resources.  
 
 I ended up going 5-3 with this deck.  Two losses were due to clear 
-misplays on my part.  Like decking myself with two Nexus of Becoming
-out.  But a very fun and interesting deck to play. 
+misplays on my part.  Like decking myself with two 
+[Nexus of Becoming](https://scryfall.com/card/big/25/nexus-of-becoming)
+out because I [Fractured Identity](https://scryfall.com/card/c17/37/fractured-identity)
+my opponents Nexus to slow down their card draw. 
+I realized my mistake 4 turns later.   
+A very fun and interesting deck to play. 
